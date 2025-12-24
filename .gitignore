@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.pytest_cache/
+
+# Virtual environments
+venv/
+.venv/
+
+# Env files
+.env
+.env.*
+
+# Django
+backend/media/
+backend/staticfiles/
+*.sqlite3
+
+# Node
+node_modules/
+dist/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
+
+# Local tooling
+.claude/
