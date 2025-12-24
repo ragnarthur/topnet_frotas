@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { motion } from 'framer-motion'
 import { vehicles } from '@/api/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -10,6 +11,19 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.08 }
+  }
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 16 },
+  visible: { opacity: 1, y: 0 }
+}
 
 export function VehiclesPage() {
   const { data, isLoading } = useQuery({
@@ -31,62 +45,69 @@ export function VehiclesPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div>
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      className="space-y-6"
+    >
+      <motion.div variants={itemVariants}>
         <h1 className="text-3xl font-bold">Veículos</h1>
         <p className="text-muted-foreground">
           Cadastro de veículos da frota
         </p>
-      </div>
+      </motion.div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Placa</TableHead>
-                <TableHead>Combustível</TableHead>
-                <TableHead>Categoria</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
+      <motion.div variants={itemVariants}>
+        <Card className="glass-card border-white/10">
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center">
-                    Carregando...
-                  </TableCell>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Placa</TableHead>
+                  <TableHead>Combustível</TableHead>
+                  <TableHead>Categoria</TableHead>
+                  <TableHead>Status</TableHead>
                 </TableRow>
-              ) : data?.results.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
-                    Nenhum veículo cadastrado
-                  </TableCell>
-                </TableRow>
-              ) : (
-                data?.results.map((vehicle) => (
-                  <TableRow key={vehicle.id}>
-                    <TableCell className="font-medium">{vehicle.name}</TableCell>
-                    <TableCell>{vehicle.plate}</TableCell>
-                    <TableCell>{getFuelTypeBadge(vehicle.fuel_type)}</TableCell>
-                    <TableCell>
-                      <Badge variant={vehicle.usage_category === 'PERSONAL' ? 'outline' : 'secondary'}>
-                        {vehicle.usage_category_display}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={vehicle.active ? 'success' : 'destructive'}>
-                        {vehicle.active ? 'Ativo' : 'Inativo'}
-                      </Badge>
+              </TableHeader>
+              <TableBody>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center">
+                      Carregando...
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
+                ) : data?.results.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                      Nenhum veículo cadastrado
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  data?.results.map((vehicle) => (
+                    <TableRow key={vehicle.id}>
+                      <TableCell className="font-medium">{vehicle.name}</TableCell>
+                      <TableCell>{vehicle.plate}</TableCell>
+                      <TableCell>{getFuelTypeBadge(vehicle.fuel_type)}</TableCell>
+                      <TableCell>
+                        <Badge variant={vehicle.usage_category === 'PERSONAL' ? 'outline' : 'secondary'}>
+                          {vehicle.usage_category_display}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={vehicle.active ? 'success' : 'destructive'}>
+                          {vehicle.active ? 'Ativo' : 'Inativo'}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </motion.div>
+    </motion.div>
   )
 }
