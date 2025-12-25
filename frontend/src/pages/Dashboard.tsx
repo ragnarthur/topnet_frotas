@@ -57,6 +57,14 @@ export function DashboardPage() {
     ? data.summary.total_cost / data.summary.total_liters
     : 0
 
+  const priceRef = data.price_reference
+  const hasNationalAvg = priceRef?.national_avg_price !== null && priceRef?.national_avg_price !== undefined
+  const deltaValue = priceRef?.delta ?? 0
+  const deltaLabel = deltaValue > 0 ? 'Economia' : deltaValue < 0 ? 'Custo acima' : 'Neutro'
+  const deltaColor = deltaValue > 0 ? 'text-emerald-400' : deltaValue < 0 ? 'text-red-400' : 'text-muted-foreground'
+  const deltaPercent = priceRef?.delta_percent ? Math.abs(priceRef.delta_percent) : 0
+  const coveragePercent = priceRef?.coverage_ratio ? priceRef.coverage_ratio * 100 : 0
+
   const monthlyData = data.monthly_trend.map(item => ({
     month: new Date(item.month).toLocaleDateString('pt-BR', { month: 'short' }),
     custo: Number(item.total_cost),
@@ -128,6 +136,44 @@ export function DashboardPage() {
           tag={data.alerts.open_count > 0 ? 'Atencao' : 'Sem alertas'}
           tagTone={data.alerts.open_count > 0 ? 'danger' : 'success'}
         />
+      </motion.div>
+
+      {/* National Average Reference */}
+      <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold">Preço Médio Nacional</h3>
+            <p className="text-sm text-muted-foreground">Referência para avaliação de ganhos/perdas</p>
+          </div>
+          <Badge variant="secondary">referência</Badge>
+        </div>
+        {hasNationalAvg ? (
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Média nacional por litro</p>
+              <p className="text-2xl font-bold">
+                {formatCurrency(Number(priceRef.national_avg_price))}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Cobertura: {formatNumber(coveragePercent, 1)}% dos litros do período
+              </p>
+            </div>
+            <div className="space-y-2">
+              <p className="text-sm text-muted-foreground">Impacto no período</p>
+              <p className={`text-2xl font-bold ${deltaColor}`}>
+                {deltaValue > 0 ? '+' : ''}
+                {formatCurrency(Math.abs(Number(deltaValue)))}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {deltaLabel} vs média ({formatNumber(deltaPercent, 1)}%)
+              </p>
+            </div>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Média nacional indisponível. Cadastre um snapshot global (manual ou ANP).
+          </p>
+        )}
       </motion.div>
 
       {/* Charts Row */}

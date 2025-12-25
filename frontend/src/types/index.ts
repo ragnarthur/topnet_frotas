@@ -187,6 +187,15 @@ export interface DashboardSummary {
     total_liters: number
     transaction_count: number
   }
+  price_reference: {
+    national_avg_price: number | null
+    coverage_liters: number
+    coverage_ratio: number
+    expected_cost: number | null
+    actual_cost: number | null
+    delta: number | null
+    delta_percent: number | null
+  }
   cost_by_vehicle: Array<{
     vehicle__id: string
     vehicle__name: string

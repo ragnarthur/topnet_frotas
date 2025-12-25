@@ -217,6 +217,42 @@ class DashboardSummaryView(APIView):
             ).order_by('month')
         )
 
+        # National average reference (manual/external) vs actual cost
+        fuel_types = list(transactions.values_list('fuel_type', flat=True).distinct())
+        snapshots = FuelPriceSnapshot.objects.filter(
+            fuel_type__in=fuel_types,
+            station__isnull=True,
+            source__in=[FuelPriceSource.EXTERNAL_ANP, FuelPriceSource.MANUAL],
+        ).order_by('fuel_type', '-collected_at')
+
+        latest_by_type = {}
+        for snapshot in snapshots:
+            if snapshot.fuel_type not in latest_by_type:
+                latest_by_type[snapshot.fuel_type] = snapshot
+
+        expected_cost = Decimal('0.00')
+        actual_cost = Decimal('0.00')
+        coverage_liters = Decimal('0.00')
+
+        if latest_by_type:
+            for tx in transactions.only('fuel_type', 'liters', 'total_cost'):
+                snapshot = latest_by_type.get(tx.fuel_type)
+                if snapshot:
+                    coverage_liters += tx.liters
+                    expected_cost += tx.liters * snapshot.price_per_liter
+                    actual_cost += tx.total_cost
+
+        if coverage_liters > 0:
+            national_avg_price = expected_cost / coverage_liters
+            delta = expected_cost - actual_cost
+            delta_percent = float((delta / expected_cost) * 100) if expected_cost > 0 else 0.0
+            coverage_ratio = float(coverage_liters / total_liters) if total_liters > 0 else 0.0
+        else:
+            national_avg_price = None
+            delta = None
+            delta_percent = None
+            coverage_ratio = 0.0
+
         # Open alerts
         alerts_queryset = Alert.objects.filter(resolved_at__isnull=True)
         if not include_personal:
@@ -241,6 +277,15 @@ class DashboardSummaryView(APIView):
                 'total_cost': total_cost,
                 'total_liters': total_liters,
                 'transaction_count': transactions.count(),
+            },
+            'price_reference': {
+                'national_avg_price': national_avg_price,
+                'coverage_liters': coverage_liters,
+                'coverage_ratio': coverage_ratio,
+                'expected_cost': expected_cost if coverage_liters > 0 else None,
+                'actual_cost': actual_cost if coverage_liters > 0 else None,
+                'delta': delta,
+                'delta_percent': delta_percent,
             },
             'cost_by_vehicle': cost_by_vehicle,
             'monthly_trend': monthly_trend,
