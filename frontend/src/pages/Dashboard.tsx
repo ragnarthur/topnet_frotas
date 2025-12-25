@@ -353,64 +353,70 @@ export function DashboardPage() {
             </div>
           </div>
           <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={monthlyData}>
-                <defs>
-                  <linearGradient id="colorCusto" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorLitros" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                <XAxis
-                  dataKey="month"
-                  stroke="#64748b"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                />
-                <YAxis
-                  stroke="#64748b"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => `R$${value / 1000}k`}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '12px',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                  }}
-                  labelStyle={{ color: '#fff' }}
-                  formatter={(value, name) => [
-                    name === 'custo' ? formatCurrency(Number(value)) : `${formatNumber(Number(value))} L`,
-                    name === 'custo' ? 'Custo' : 'Litros'
-                  ]}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="custo"
-                  stroke="#8b5cf6"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorCusto)"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="litros"
-                  stroke="#06b6d4"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#colorLitros)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            {monthlyData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={monthlyData}>
+                  <defs>
+                    <linearGradient id="colorCusto" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="colorLitros" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
+                  <XAxis
+                    dataKey="month"
+                    stroke="#64748b"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                  />
+                  <YAxis
+                    stroke="#64748b"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => `R$${value / 1000}k`}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
+                    }}
+                    labelStyle={{ color: '#fff' }}
+                    formatter={(value, name) => [
+                      name === 'custo' ? formatCurrency(Number(value)) : `${formatNumber(Number(value))} L`,
+                      name === 'custo' ? 'Custo' : 'Litros'
+                    ]}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="custo"
+                    stroke="#8b5cf6"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorCusto)"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="litros"
+                    stroke="#06b6d4"
+                    strokeWidth={2}
+                    fillOpacity={1}
+                    fill="url(#colorLitros)"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <p>Nenhum dado no período</p>
+              </div>
+            )}
           </div>
         </motion.div>
 
@@ -423,41 +429,47 @@ export function DashboardPage() {
             </div>
           </div>
           <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={vehicleData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" horizontal={false} />
-                <XAxis
-                  type="number"
-                  stroke="#64748b"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  tickFormatter={(value) => `R$${value / 1000}k`}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="name"
-                  stroke="#64748b"
-                  fontSize={12}
-                  tickLine={false}
-                  axisLine={false}
-                  width={80}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    borderRadius: '12px',
-                  }}
-                  formatter={(value) => [formatCurrency(Number(value)), 'Custo']}
-                />
-                <Bar dataKey="custo" radius={[0, 8, 8, 0]}>
-                  {vehicleData.map((_, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            {vehicleData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={vehicleData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" horizontal={false} />
+                  <XAxis
+                    type="number"
+                    stroke="#64748b"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(value) => `R$${value / 1000}k`}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="name"
+                    stroke="#64748b"
+                    fontSize={12}
+                    tickLine={false}
+                    axisLine={false}
+                    width={80}
+                  />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: 'rgba(15, 23, 42, 0.9)',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      borderRadius: '12px',
+                    }}
+                    formatter={(value) => [formatCurrency(Number(value)), 'Custo']}
+                  />
+                  <Bar dataKey="custo" radius={[0, 8, 8, 0]}>
+                    {vehicleData.map((_, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                <p>Nenhum veículo com abastecimentos</p>
+              </div>
+            )}
           </div>
         </motion.div>
       </div>
