@@ -1,8 +1,14 @@
+import json
+
+import redis
+from django.conf import settings
+from django.http import HttpResponseForbidden, HttpResponseServerError, StreamingHttpResponse
 from django_filters import rest_framework as filters
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from apps.users.permissions import IsAdminOrDriver, IsAdminUser
 
@@ -169,3 +175,59 @@ class FuelStationViewSet(viewsets.ModelViewSet):
         stations = FuelStation.objects.filter(active=True).order_by('name')
         serializer = FuelStationListSerializer(stations, many=True)
         return Response(serializer.data)
+
+
+def _get_user_from_token(request):
+    auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+    token = None
+    if auth_header.lower().startswith('bearer '):
+        token = auth_header.split(' ', 1)[1]
+    if not token:
+        token = request.GET.get('token')
+    if not token:
+        return None
+
+    auth = JWTAuthentication()
+    try:
+        validated = auth.get_validated_token(token)
+        return auth.get_user(validated)
+    except Exception:
+        return None
+
+
+def event_stream(request):
+    user = _get_user_from_token(request)
+    if not user or not user.is_staff:
+        return HttpResponseForbidden('Admin only')
+
+    redis_url = getattr(settings, 'REDIS_URL', None) or settings.CELERY_BROKER_URL
+    channel = getattr(settings, 'REDIS_PUBSUB_CHANNEL', 'topnet.frotas.events')
+
+    try:
+        client = redis.from_url(redis_url)
+        pubsub = client.pubsub()
+        pubsub.subscribe(channel)
+    except Exception:
+        return HttpResponseServerError('Redis unavailable')
+
+    def stream():
+        try:
+            yield "retry: 2000\n\n"
+            while True:
+                message = pubsub.get_message(ignore_subscribe_messages=True, timeout=15)
+                if message:
+                    payload = message.get('data')
+                    if isinstance(payload, bytes):
+                        payload = payload.decode('utf-8')
+                    if not isinstance(payload, str):
+                        payload = json.dumps(payload)
+                    yield f"data: {payload}\n\n"
+                else:
+                    yield ": keep-alive\n\n"
+        finally:
+            pubsub.close()
+
+    response = StreamingHttpResponse(stream(), content_type='text/event-stream')
+    response['Cache-Control'] = 'no-cache'
+    response['X-Accel-Buffering'] = 'no'
+    return response

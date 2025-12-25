@@ -15,10 +15,13 @@ import {
   User,
   Globe,
 } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
+import { tokenStore } from '@/lib/tokenStore'
+import { toast } from 'sonner'
 
 interface NavItem {
   name: string
@@ -44,7 +47,43 @@ interface LayoutProps {
 export function Layout({ children }: LayoutProps) {
   const location = useLocation()
   const { logout, user, isAdmin } = useAuth()
+  const queryClient = useQueryClient()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  useEffect(() => {
+    if (!isAdmin) {
+      return
+    }
+
+    const token = tokenStore.getAccess()
+    if (!token) {
+      return
+    }
+
+    const source = new EventSource(`/api/events/stream/?token=${encodeURIComponent(token)}`)
+
+    source.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data)
+        if (payload?.type === 'FUEL_TRANSACTION_CREATED') {
+          toast.info('Novo abastecimento registrado')
+          queryClient.invalidateQueries({ queryKey: ['fuel-transactions'] })
+          queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+          queryClient.invalidateQueries({ queryKey: ['alerts'] })
+        } else if (payload?.type === 'FUEL_TRANSACTION_UPDATED') {
+          queryClient.invalidateQueries({ queryKey: ['fuel-transactions'] })
+          queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+          queryClient.invalidateQueries({ queryKey: ['alerts'] })
+        }
+      } catch {
+        // Ignore malformed events
+      }
+    }
+
+    return () => {
+      source.close()
+    }
+  }, [isAdmin, queryClient])
 
   // Filter navigation based on user role
   const navigation = useMemo(() => {

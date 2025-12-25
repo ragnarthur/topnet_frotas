@@ -6,6 +6,7 @@ from .views import (
     DriverViewSet,
     FuelStationViewSet,
     VehicleViewSet,
+    event_stream,
 )
 
 router = DefaultRouter()
@@ -15,5 +16,6 @@ router.register('cost-centers', CostCenterViewSet, basename='cost-center')
 router.register('fuel-stations', FuelStationViewSet, basename='fuel-station')
 
 urlpatterns = [
+    path('events/stream/', event_stream, name='event-stream'),
     path('', include(router.urls)),
 ]
