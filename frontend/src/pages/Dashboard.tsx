@@ -26,6 +26,7 @@ import { toast } from 'sonner'
 import {
   formatCurrency,
   formatCurrencyInput,
+  formatDate,
   formatNumber,
   maskCurrencyInput,
   parseDecimalInput,
@@ -191,7 +192,7 @@ export function DashboardPage() {
           <span className="gradient-text">Dashboard</span>
         </h1>
         <p className="text-muted-foreground">
-          Período: {data.period.from} a {data.period.to}
+          Período: {formatDate(data.period.from)} a {formatDate(data.period.to)}
         </p>
       </motion.div>
 
