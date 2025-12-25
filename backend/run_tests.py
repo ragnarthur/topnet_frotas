@@ -2,6 +2,7 @@
 """
 Testes completos de API e segurança para TopNet Frotas
 """
+import os
 import requests
 import json
 from datetime import datetime, timedelta
@@ -9,13 +10,23 @@ from decimal import Decimal
 
 BASE_URL = "http://localhost:8000/api"
 RESULTS = {"passed": 0, "failed": 0, "warnings": []}
+SESSION = requests.Session()
+
+
+def get_credentials():
+    username = os.getenv("TEST_USERNAME")
+    password = os.getenv("TEST_PASSWORD")
+    if not username or not password:
+        raise RuntimeError("Defina TEST_USERNAME e TEST_PASSWORD para executar os testes.")
+    return username, password
 
 
 def get_token():
     """Obtém token de autenticação"""
-    response = requests.post(
+    username, password = get_credentials()
+    response = SESSION.post(
         f"{BASE_URL}/auth/token/",
-        json={"username": "admin", "password": "admin123"}
+        json={"username": username, "password": password}
     )
     return response.json().get("access")
 
@@ -55,7 +66,8 @@ def test_authentication():
     test("Bloqueia token inválido", r.status_code == 401)
 
     # Teste com credenciais erradas
-    r = requests.post(f"{BASE_URL}/auth/token/", json={"username": "admin", "password": "wrong"})
+    username, _ = get_credentials()
+    r = requests.post(f"{BASE_URL}/auth/token/", json={"username": username, "password": "wrong"})
     test("Bloqueia senha incorreta", r.status_code == 401)
 
     # Teste SQL Injection no login
@@ -68,9 +80,9 @@ def test_authentication():
     test("Aceita token válido", r.status_code == 200)
 
     # Teste refresh token
-    r = requests.post(f"{BASE_URL}/auth/token/", json={"username": "admin", "password": "admin123"})
-    refresh = r.json().get("refresh")
-    r = requests.post(f"{BASE_URL}/auth/token/refresh/", json={"refresh": refresh})
+    username, password = get_credentials()
+    r = SESSION.post(f"{BASE_URL}/auth/token/", json={"username": username, "password": password})
+    r = SESSION.post(f"{BASE_URL}/auth/token/refresh/", json={})
     test("Refresh token funciona", r.status_code == 200 and "access" in r.json())
 
     return token

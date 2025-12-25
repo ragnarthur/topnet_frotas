@@ -1,8 +1,13 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react'
-import { auth } from '@/api/client'
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from 'react'
+import { auth, type UserProfile } from '@/api/client'
+import { tokenStore } from '@/lib/tokenStore'
 
 interface AuthContextType {
   isAuthenticated: boolean
+  isLoading: boolean
+  user: UserProfile | null
+  isAdmin: boolean
+  isDriver: boolean
   login: (username: string, password: string) => Promise<void>
   logout: () => void
 }
@@ -10,25 +15,72 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [isAuthenticated, setIsAuthenticated] = useState(() => {
-    return !!localStorage.getItem('access_token')
-  })
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+  const [user, setUser] = useState<UserProfile | null>(null)
+
+  const fetchProfile = async () => {
+    try {
+      const profile = await auth.profile()
+      setUser(profile)
+      return profile
+    } catch {
+      setUser(null)
+      return null
+    }
+  }
+
+  useEffect(() => {
+    let isMounted = true
+    const bootstrapAuth = async () => {
+      try {
+        const tokens = await auth.refresh()
+        if (!isMounted) {
+          return
+        }
+        tokenStore.setAccess(tokens.access)
+        setIsAuthenticated(true)
+        // Fetch user profile after successful token refresh
+        await fetchProfile()
+      } catch {
+        if (!isMounted) {
+          return
+        }
+        tokenStore.clear()
+        setIsAuthenticated(false)
+        setUser(null)
+      } finally {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+      }
+    }
+    bootstrapAuth()
+    return () => {
+      isMounted = false
+    }
+  }, [])
 
   const login = useCallback(async (username: string, password: string) => {
     const tokens = await auth.login(username, password)
-    localStorage.setItem('access_token', tokens.access)
-    localStorage.setItem('refresh_token', tokens.refresh)
+    tokenStore.setAccess(tokens.access)
     setIsAuthenticated(true)
+    // Fetch user profile after successful login
+    await fetchProfile()
   }, [])
 
   const logout = useCallback(() => {
-    localStorage.removeItem('access_token')
-    localStorage.removeItem('refresh_token')
+    tokenStore.clear()
+    void auth.logout()
     setIsAuthenticated(false)
+    setUser(null)
   }, [])
 
+  const isAdmin = user?.is_admin ?? false
+  const isDriver = user?.is_driver ?? false
+
   return (
-    <AuthContext.Provider value={{ isAuthenticated, login, logout }}>
+    <AuthContext.Provider value={{ isAuthenticated, isLoading, user, isAdmin, isDriver, login, logout }}>
       {children}
     </AuthContext.Provider>
   )

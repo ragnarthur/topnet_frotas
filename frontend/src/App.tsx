@@ -15,6 +15,7 @@ import { Toaster } from '@/components/ui/sonner'
 // Lazy load pages
 const LoginPage = lazy(() => import('@/pages/Login').then(m => ({ default: m.LoginPage })))
 const DashboardPage = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.DashboardPage })))
+const DriverDashboardPage = lazy(() => import('@/pages/DriverDashboard').then(m => ({ default: m.DriverDashboardPage })))
 const TransactionsPage = lazy(() => import('@/pages/Transactions').then(m => ({ default: m.TransactionsPage })))
 const VehiclesPage = lazy(() => import('@/pages/Vehicles').then(m => ({ default: m.VehiclesPage })))
 const DriversPage = lazy(() => import('@/pages/Drivers').then(m => ({ default: m.DriversPage })))
@@ -27,7 +28,7 @@ function PageLoader() {
   return (
     <div className="flex h-[50vh] items-center justify-center">
       <div className="flex flex-col items-center gap-4">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-500 border-t-transparent" />
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-t-transparent" />
         <p className="text-sm text-muted-foreground">Carregando...</p>
       </div>
     </div>
@@ -62,7 +63,10 @@ const loginRoute = createRoute({
 
 // Protected layout
 function ProtectedLayout() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isLoading } = useAuth()
+  if (isLoading) {
+    return <PageLoader />
+  }
   if (!isAuthenticated) {
     return <Navigate to="/login" />
   }
@@ -71,6 +75,41 @@ function ProtectedLayout() {
       <Outlet />
     </Layout>
   )
+}
+
+// Dashboard router - shows admin or driver dashboard based on role
+function DashboardRouter() {
+  const { isAdmin, isDriver, isLoading } = useAuth()
+
+  if (isLoading) {
+    return <PageLoader />
+  }
+
+  if (isAdmin) {
+    return <LazyPage><DashboardPage /></LazyPage>
+  }
+
+  if (isDriver) {
+    return <LazyPage><DriverDashboardPage /></LazyPage>
+  }
+
+  // Fallback for users without role
+  return <LazyPage><DriverDashboardPage /></LazyPage>
+}
+
+// Admin only route guard
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { isAdmin, isLoading } = useAuth()
+
+  if (isLoading) {
+    return <PageLoader />
+  }
+
+  if (!isAdmin) {
+    return <Navigate to="/" />
+  }
+
+  return <>{children}</>
 }
 
 const protectedRoute = createRoute({
@@ -83,7 +122,7 @@ const protectedRoute = createRoute({
 const dashboardRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/',
-  component: () => <LazyPage><DashboardPage /></LazyPage>,
+  component: DashboardRouter,
 })
 
 const transactionsRoute = createRoute({
@@ -92,34 +131,35 @@ const transactionsRoute = createRoute({
   component: () => <LazyPage><TransactionsPage /></LazyPage>,
 })
 
+// Admin only routes
 const vehiclesRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/veiculos',
-  component: () => <LazyPage><VehiclesPage /></LazyPage>,
+  component: () => <AdminRoute><LazyPage><VehiclesPage /></LazyPage></AdminRoute>,
 })
 
 const driversRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/motoristas',
-  component: () => <LazyPage><DriversPage /></LazyPage>,
+  component: () => <AdminRoute><LazyPage><DriversPage /></LazyPage></AdminRoute>,
 })
 
 const costCentersRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/centros-custo',
-  component: () => <LazyPage><CostCentersPage /></LazyPage>,
+  component: () => <AdminRoute><LazyPage><CostCentersPage /></LazyPage></AdminRoute>,
 })
 
 const stationsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/postos',
-  component: () => <LazyPage><StationsPage /></LazyPage>,
+  component: () => <AdminRoute><LazyPage><StationsPage /></LazyPage></AdminRoute>,
 })
 
 const alertsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/alertas',
-  component: () => <LazyPage><AlertsPage /></LazyPage>,
+  component: () => <AdminRoute><LazyPage><AlertsPage /></LazyPage></AdminRoute>,
 })
 
 // Create route tree

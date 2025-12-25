@@ -1,7 +1,10 @@
 from django_filters import rest_framework as filters
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
+
+from apps.users.permissions import IsAdminOrDriver, IsAdminUser
 
 from .models import CostCenter, Driver, FuelStation, Vehicle
 from .serializers import (
@@ -29,6 +32,7 @@ class VehicleFilter(filters.FilterSet):
 class VehicleViewSet(viewsets.ModelViewSet):
     queryset = Vehicle.objects.all()
     serializer_class = VehicleSerializer
+    permission_classes = [IsAdminOrDriver]
     filterset_class = VehicleFilter
     search_fields = ['name', 'plate', 'model']
     ordering_fields = ['name', 'plate', 'created_at']
@@ -39,10 +43,38 @@ class VehicleViewSet(viewsets.ModelViewSet):
             return VehicleListSerializer
         return VehicleSerializer
 
+    def create(self, request, *args, **kwargs):
+        if not request.user.is_staff:
+            raise PermissionDenied('Somente administradores podem cadastrar veículos.')
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        if not request.user.is_staff:
+            raise PermissionDenied('Somente administradores podem editar veículos.')
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        if not request.user.is_staff:
+            raise PermissionDenied('Somente administradores podem excluir veículos.')
+        return super().destroy(request, *args, **kwargs)
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = super().get_queryset()
+
+        if user.is_staff:
+            return queryset
+
+        driver = getattr(user, 'driver_profile', None)
+        if driver and driver.current_vehicle_id:
+            return queryset.filter(id=driver.current_vehicle_id)
+
+        return queryset.none()
+
     @action(detail=False, methods=['get'])
     def active(self, request):
         """Return only active vehicles (for dropdowns)."""
-        vehicles = Vehicle.objects.filter(active=True).order_by('name')
+        vehicles = self.get_queryset().filter(active=True).order_by('name')
         serializer = VehicleListSerializer(vehicles, many=True)
         return Response(serializer.data)
 
@@ -58,6 +90,7 @@ class DriverFilter(filters.FilterSet):
 class DriverViewSet(viewsets.ModelViewSet):
     queryset = Driver.objects.all()
     serializer_class = DriverSerializer
+    permission_classes = [IsAdminUser]
     filterset_class = DriverFilter
     search_fields = ['name', 'doc_id']
     ordering_fields = ['name', 'created_at']
@@ -88,6 +121,7 @@ class CostCenterFilter(filters.FilterSet):
 class CostCenterViewSet(viewsets.ModelViewSet):
     queryset = CostCenter.objects.all()
     serializer_class = CostCenterSerializer
+    permission_classes = [IsAdminUser]
     filterset_class = CostCenterFilter
     search_fields = ['name']
     ordering_fields = ['name', 'category', 'created_at']
@@ -118,6 +152,7 @@ class FuelStationFilter(filters.FilterSet):
 class FuelStationViewSet(viewsets.ModelViewSet):
     queryset = FuelStation.objects.all()
     serializer_class = FuelStationSerializer
+    permission_classes = [IsAdminUser]
     filterset_class = FuelStationFilter
     search_fields = ['name', 'city', 'address']
     ordering_fields = ['name', 'city', 'created_at']

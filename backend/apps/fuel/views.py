@@ -1,17 +1,20 @@
-from datetime import datetime
+from datetime import timedelta
 from decimal import Decimal
 
-from django.db.models import Avg, Count, Sum
+from django.db.models import Count, Sum
 from django.db.models.functions import TruncMonth
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from django_filters import rest_framework as filters
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.alerts.models import Alert
-from apps.core.models import FuelType, UsageCategory, Vehicle
+from apps.core.models import FuelType, UsageCategory
+from apps.users.permissions import IsAdminOrDriver, IsAdminUser, IsDriver
 
 from .models import FuelPriceSnapshot, FuelPriceSource, FuelTransaction
 from .serializers import (
@@ -19,7 +22,6 @@ from .serializers import (
     FuelTransactionCreateSerializer,
     FuelTransactionListSerializer,
     FuelTransactionSerializer,
-    LatestPriceSerializer,
     NationalFuelPriceUpsertSerializer,
 )
 
@@ -42,10 +44,27 @@ class FuelTransactionViewSet(viewsets.ModelViewSet):
     queryset = FuelTransaction.objects.select_related(
         'vehicle', 'driver', 'station', 'cost_center'
     ).all()
+    permission_classes = [IsAdminOrDriver]
     filterset_class = FuelTransactionFilter
     search_fields = ['vehicle__name', 'vehicle__plate', 'notes']
     ordering_fields = ['purchased_at', 'total_cost', 'liters', 'odometer_km']
     ordering = ['-purchased_at']
+
+    def get_queryset(self):
+        """Filter queryset based on user role."""
+        user = self.request.user
+        queryset = super().get_queryset()
+
+        # Admins see all transactions
+        if user.is_staff:
+            return queryset
+
+        # Drivers see only their own transactions
+        if hasattr(user, 'driver_profile') and user.driver_profile:
+            return queryset.filter(driver=user.driver_profile)
+
+        # No access for other users
+        return queryset.none()
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -57,15 +76,51 @@ class FuelTransactionViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        instance = serializer.save()
+        self.perform_create(serializer)
         # Return full transaction data
-        output_serializer = FuelTransactionSerializer(instance)
+        output_serializer = FuelTransactionSerializer(serializer.instance)
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
+    def perform_create(self, serializer):
+        """Auto-set driver field for driver users."""
+        user = self.request.user
+
+        if user.is_staff:
+            serializer.save()
+            return
+
+        driver = getattr(user, 'driver_profile', None)
+        if not driver:
+            raise PermissionDenied('Somente motoristas podem registrar abastecimentos.')
+
+        if not driver.current_vehicle_id:
+            raise ValidationError({
+                'vehicle': 'Motorista sem veículo atual definido. Solicite ao administrador.'
+            })
+
+        requested_vehicle = serializer.validated_data.get('vehicle')
+        if requested_vehicle and requested_vehicle.id != driver.current_vehicle_id:
+            raise ValidationError({
+                'vehicle': 'Motorista só pode registrar abastecimento do veículo atual.'
+            })
+
+        serializer.save(driver=driver, vehicle=driver.current_vehicle)
+
+    def update(self, request, *args, **kwargs):
+        if not request.user.is_staff:
+            raise PermissionDenied('Somente administradores podem editar abastecimentos.')
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        if not request.user.is_staff:
+            raise PermissionDenied('Somente administradores podem excluir abastecimentos.')
+        return super().destroy(request, *args, **kwargs)
 
 
 class FuelPriceSnapshotViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = FuelPriceSnapshot.objects.select_related('station').all()
     serializer_class = FuelPriceSnapshotSerializer
+    permission_classes = [IsAdminUser]
     filterset_fields = ['fuel_type', 'station', 'source']
     ordering = ['-collected_at']
 
@@ -126,6 +181,7 @@ class LatestFuelPriceView(APIView):
 
 class NationalFuelPriceView(APIView):
     """Create/update national average fuel price (manual reference)."""
+    permission_classes = [IsAdminUser]
 
     def post(self, request):
         serializer = NationalFuelPriceUpsertSerializer(data=request.data)
@@ -150,6 +206,7 @@ class NationalFuelPriceView(APIView):
 
 class DashboardSummaryView(APIView):
     """Dashboard summary with costs, consumption and alerts."""
+    permission_classes = [IsAdminUser]
 
     def get(self, request):
         # Parse date filters
@@ -162,12 +219,30 @@ class DashboardSummaryView(APIView):
             today = timezone.now().date()
             from_date = today.replace(day=1)
         else:
-            from_date = datetime.strptime(from_date, '%Y-%m-%d').date()
+            parsed_from = parse_date(from_date)
+            if not parsed_from:
+                return Response(
+                    {'error': "Invalid 'from' date. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            from_date = parsed_from
 
         if not to_date:
             to_date = timezone.now().date()
         else:
-            to_date = datetime.strptime(to_date, '%Y-%m-%d').date()
+            parsed_to = parse_date(to_date)
+            if not parsed_to:
+                return Response(
+                    {'error': "Invalid 'to' date. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            to_date = parsed_to
+
+        if from_date > to_date:
+            return Response(
+                {'error': "'from' date must be earlier than or equal to 'to' date."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         # Base queryset
         transactions = FuelTransaction.objects.filter(
@@ -335,6 +410,7 @@ class DashboardSummaryView(APIView):
 
 class FetchANPPricesView(APIView):
     """Manually trigger ANP price fetch."""
+    permission_classes = [IsAdminUser]
 
     def post(self, request):
         from apps.fuel.services import fetch_and_save_anp_prices
@@ -352,3 +428,72 @@ class FetchANPPricesView(APIView):
                 'message': 'Failed to fetch ANP prices',
                 'errors': result['errors'],
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DriverDashboardView(APIView):
+    """Dashboard for drivers - shows their own stats and recent transactions."""
+    permission_classes = [IsDriver]
+
+    def get(self, request):
+        user = request.user
+
+        driver = user.driver_profile
+
+        # Get driver's transactions (last 30 days)
+        thirty_days_ago = timezone.now().date() - timedelta(days=30)
+        transactions = FuelTransaction.objects.filter(
+            driver=driver,
+            purchased_at__date__gte=thirty_days_ago
+        ).order_by('-purchased_at')
+
+        # Calculate stats
+        total_liters = transactions.aggregate(total=Sum('liters'))['total'] or Decimal('0.00')
+        total_cost = transactions.aggregate(total=Sum('total_cost'))['total'] or Decimal('0.00')
+        transaction_count = transactions.count()
+
+        # Calculate average km/L if we have enough data
+        avg_km_per_liter = None
+        if transactions.count() >= 2:
+            # Group by vehicle and calculate km/L
+            vehicles_with_txs = transactions.values('vehicle').distinct()
+            total_km = 0
+            total_l = 0
+            for v in vehicles_with_txs:
+                v_txs = transactions.filter(vehicle_id=v['vehicle']).order_by('purchased_at')
+                if v_txs.count() >= 2:
+                    first_tx = v_txs.first()
+                    last_tx = v_txs.last()
+                    km = last_tx.odometer_km - first_tx.odometer_km
+                    liters = v_txs.aggregate(total=Sum('liters'))['total']
+                    if km > 0 and liters > 0:
+                        total_km += km
+                        total_l += float(liters)
+
+            if total_km > 0 and total_l > 0:
+                avg_km_per_liter = round(total_km / total_l, 2)
+
+        # Recent transactions (last 10)
+        recent_transactions = list(
+            transactions[:10].values(
+                'id', 'vehicle__name', 'vehicle__plate',
+                'purchased_at', 'liters', 'total_cost', 'odometer_km'
+            )
+        )
+
+        return Response({
+            'driver': {
+                'id': str(driver.id),
+                'name': driver.name,
+            },
+            'period': {
+                'from': thirty_days_ago.isoformat(),
+                'to': timezone.now().date().isoformat(),
+            },
+            'stats': {
+                'total_liters': total_liters,
+                'total_cost': total_cost,
+                'transaction_count': transaction_count,
+                'avg_km_per_liter': avg_km_per_liter,
+            },
+            'recent_transactions': recent_transactions,
+        })

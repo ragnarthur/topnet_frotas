@@ -2,12 +2,19 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Plus, Pencil, Trash2, User } from 'lucide-react'
-import { drivers } from '@/api/client'
+import { drivers, vehicles } from '@/api/client'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Table,
   TableBody,
@@ -44,6 +51,7 @@ interface DriverFormData {
   name: string
   doc_id: string
   phone: string
+  current_vehicle: string
   active: boolean
 }
 
@@ -51,6 +59,7 @@ const emptyFormData: DriverFormData = {
   name: '',
   doc_id: '',
   phone: '',
+  current_vehicle: '',
   active: true,
 }
 
@@ -65,6 +74,11 @@ export function DriversPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['drivers'],
     queryFn: () => drivers.list(),
+  })
+
+  const { data: vehiclesList } = useQuery({
+    queryKey: ['vehicles-active'],
+    queryFn: () => vehicles.listActive(),
   })
 
   const createMutation = useMutation({
@@ -117,6 +131,7 @@ export function DriversPage() {
       name: driver.name,
       doc_id: driver.doc_id || '',
       phone: driver.phone || '',
+      current_vehicle: driver.current_vehicle || '',
       active: driver.active,
     })
     setIsDialogOpen(true)
@@ -140,6 +155,7 @@ export function DriversPage() {
       name: formData.name,
       doc_id: formData.doc_id || '',
       phone: formData.phone || '',
+      current_vehicle: formData.current_vehicle || null,
       active: formData.active,
     }
 
@@ -174,7 +190,7 @@ export function DriversPage() {
         </div>
         <Button
           onClick={openCreateDialog}
-          className="bg-gradient-to-r from-violet-500 to-cyan-500 hover:from-violet-400 hover:to-cyan-400"
+          className="bg-gradient-to-r from-blue-500 to-sky-500 hover:from-blue-400 hover:to-sky-400"
         >
           <Plus className="mr-2 h-4 w-4" />
           Novo Motorista
@@ -190,6 +206,7 @@ export function DriversPage() {
                   <TableHead>Nome</TableHead>
                   <TableHead>Documento</TableHead>
                   <TableHead>Telefone</TableHead>
+                  <TableHead>Veículo Atual</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Acoes</TableHead>
                 </TableRow>
@@ -197,13 +214,13 @@ export function DriversPage() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center">
+                    <TableCell colSpan={6} className="text-center">
                       Carregando...
                     </TableCell>
                   </TableRow>
                 ) : data?.results.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground">
+                    <TableCell colSpan={6} className="text-center text-muted-foreground">
                       Nenhum motorista cadastrado
                     </TableCell>
                   </TableRow>
@@ -212,8 +229,8 @@ export function DriversPage() {
                     <TableRow key={driver.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-cyan-500/20">
-                            <User className="h-4 w-4 text-violet-400" />
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-sky-500/20">
+                            <User className="h-4 w-4 text-blue-400" />
                           </div>
                           {driver.name}
                         </div>
@@ -223,6 +240,11 @@ export function DriversPage() {
                       </TableCell>
                       <TableCell className="text-muted-foreground">
                         {driver.phone || '-'}
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {driver.current_vehicle_detail
+                          ? `${driver.current_vehicle_detail.name} (${driver.current_vehicle_detail.plate})`
+                          : '-'}
                       </TableCell>
                       <TableCell>
                         <Badge variant={driver.active ? 'success' : 'destructive'}>
@@ -235,7 +257,7 @@ export function DriversPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => drivers.get(driver.id).then(openEditDialog)}
-                            className="hover:bg-violet-500/20"
+                            className="hover:bg-blue-500/20"
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -263,7 +285,7 @@ export function DriversPage() {
         <DialogContent className="glass-card border-white/10 sm:max-w-[450px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-sky-500">
                 <User className="h-5 w-5 text-white" />
               </div>
               {editingDriver ? 'Editar Motorista' : 'Novo Motorista'}
@@ -310,6 +332,24 @@ export function DriversPage() {
                   />
                 </div>
               </div>
+              <div className="space-y-2">
+                <Label>Veículo Atual</Label>
+                <Select
+                  value={formData.current_vehicle}
+                  onValueChange={(value) => setFormData({ ...formData, current_vehicle: value })}
+                >
+                  <SelectTrigger className="bg-white/5 border-white/10">
+                    <SelectValue placeholder="Selecione..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {vehiclesList?.map((vehicle) => (
+                      <SelectItem key={vehicle.id} value={vehicle.id}>
+                        {vehicle.name} ({vehicle.plate})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
 
               {editingDriver && (
                 <div className="flex items-center gap-2">
@@ -338,7 +378,7 @@ export function DriversPage() {
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="bg-gradient-to-r from-violet-500 to-cyan-500 hover:from-violet-400 hover:to-cyan-400"
+                className="bg-gradient-to-r from-blue-500 to-sky-500 hover:from-blue-400 hover:to-sky-400"
               >
                 {isSubmitting ? 'Salvando...' : editingDriver ? 'Atualizar' : 'Criar'}
               </Button>

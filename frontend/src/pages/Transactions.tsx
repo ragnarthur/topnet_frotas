@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { CalendarClock, Plus } from 'lucide-react'
@@ -12,6 +12,7 @@ import {
   parseDecimalInput,
 } from '@/lib/utils'
 import type { FuelType } from '@/types'
+import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -32,6 +33,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { toast } from 'sonner'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -94,9 +96,11 @@ function maskIntegerInput(value: string) {
 
 export function TransactionsPage() {
   const dateTimeInputRef = useRef<HTMLInputElement | null>(null)
+  const { isAdmin, isDriver, user } = useAuth()
+  const driverVehicle = user?.driver?.current_vehicle || null
   const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({
-    vehicle: '',
+  const buildEmptyForm = (vehicleId = '', fuelType: FuelType = 'GASOLINE') => ({
+    vehicle: vehicleId,
     driver: '',
     station: '',
     cost_center: '',
@@ -104,9 +108,10 @@ export function TransactionsPage() {
     liters: '',
     unit_price: '',
     odometer_km: '',
-    fuel_type: 'GASOLINE' as FuelType,
+    fuel_type: fuelType,
     notes: '',
   })
+  const [form, setForm] = useState(buildEmptyForm())
 
   const queryClient = useQueryClient()
 
@@ -118,21 +123,25 @@ export function TransactionsPage() {
   const { data: vehiclesList } = useQuery({
     queryKey: ['vehicles-active'],
     queryFn: () => vehicles.listActive(),
+    enabled: isAdmin,
   })
 
   const { data: driversList } = useQuery({
     queryKey: ['drivers-active'],
     queryFn: () => drivers.listActive(),
+    enabled: isAdmin,
   })
 
   const { data: stationsList } = useQuery({
     queryKey: ['stations-active'],
     queryFn: () => fuelStations.listActive(),
+    enabled: isAdmin,
   })
 
   const { data: costCentersList } = useQuery({
     queryKey: ['cost-centers-active'],
     queryFn: () => costCenters.listActive(),
+    enabled: isAdmin,
   })
 
   const createMutation = useMutation({
@@ -141,20 +150,37 @@ export function TransactionsPage() {
       queryClient.invalidateQueries({ queryKey: ['fuel-transactions'] })
       queryClient.invalidateQueries({ queryKey: ['dashboard'] })
       setShowForm(false)
-      setForm({
-        vehicle: '',
-        driver: '',
-        station: '',
-        cost_center: '',
-        purchased_at: getNowLocalInput(),
-        liters: '',
-        unit_price: '',
-        odometer_km: '',
-        fuel_type: 'GASOLINE',
-        notes: '',
-      })
+      setForm(buildEmptyForm(
+        isDriver && driverVehicle ? driverVehicle.id : '',
+        isDriver && driverVehicle ? driverVehicle.fuel_type : 'GASOLINE'
+      ))
     },
   })
+
+  useEffect(() => {
+    if (!isDriver || !driverVehicle) {
+      return
+    }
+    setForm((prev) => ({
+      ...prev,
+      vehicle: driverVehicle.id,
+      fuel_type: driverVehicle.fuel_type,
+    }))
+    const loadPrice = async () => {
+      try {
+        const price = await fuelPrices.latest(driverVehicle.fuel_type)
+        if (price) {
+          setForm((prev) => ({
+            ...prev,
+            unit_price: formatCurrencyInput(price.price_per_liter, 4)
+          }))
+        }
+      } catch {
+        // Ignore error, price will be empty
+      }
+    }
+    void loadPrice()
+  }, [isDriver, driverVehicle])
 
   const handleVehicleChange = async (vehicleId: string) => {
     setForm((prev) => ({ ...prev, vehicle: vehicleId }))
@@ -177,11 +203,16 @@ export function TransactionsPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    const vehicleId = isDriver && driverVehicle ? driverVehicle.id : form.vehicle
+    if (!vehicleId) {
+      toast.error('Defina o veículo atual antes de registrar o abastecimento.')
+      return
+    }
     createMutation.mutate({
-      vehicle: form.vehicle,
-      driver: form.driver || undefined,
-      station: form.station || undefined,
-      cost_center: form.cost_center || undefined,
+      vehicle: vehicleId,
+      driver: isAdmin ? (form.driver || undefined) : undefined,
+      station: isAdmin ? (form.station || undefined) : undefined,
+      cost_center: isAdmin ? (form.cost_center || undefined) : undefined,
       purchased_at: form.purchased_at,
       liters: parseDecimalInput(form.liters),
       unit_price: parseDecimalInput(form.unit_price),
@@ -207,8 +238,16 @@ export function TransactionsPage() {
         </div>
         <Button
           onClick={() => {
+            if (isDriver && !driverVehicle) {
+              toast.error('Veículo atual não definido. Solicite ao administrador.')
+              return
+            }
             if (!showForm) {
-              setForm((prev) => ({ ...prev, purchased_at: getNowLocalInput() }))
+              if (isDriver && driverVehicle) {
+                setForm(buildEmptyForm(driverVehicle.id, driverVehicle.fuel_type))
+              } else {
+                setForm((prev) => ({ ...prev, purchased_at: getNowLocalInput() }))
+              }
             }
             setShowForm((prev) => !prev)
           }}
@@ -233,67 +272,81 @@ export function TransactionsPage() {
                 <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   <div className="space-y-2">
                     <Label>Veículo *</Label>
-                    <Select value={form.vehicle} onValueChange={handleVehicleChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {vehiclesList?.map((v) => (
-                          <SelectItem key={v.id} value={v.id}>
-                            {v.name} ({v.plate})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {isAdmin ? (
+                      <Select value={form.vehicle} onValueChange={handleVehicleChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {vehiclesList?.map((v) => (
+                            <SelectItem key={v.id} value={v.id}>
+                              {v.name} ({v.plate})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        value={driverVehicle ? `${driverVehicle.name} (${driverVehicle.plate})` : ''}
+                        placeholder="Veículo atual não definido"
+                        disabled
+                      />
+                    )}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label>Motorista</Label>
-                    <Select value={form.driver} onValueChange={(v) => setForm((prev) => ({ ...prev, driver: v }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {driversList?.map((d) => (
-                          <SelectItem key={d.id} value={d.id}>
-                            {d.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {isAdmin && (
+                    <div className="space-y-2">
+                      <Label>Motorista</Label>
+                      <Select value={form.driver} onValueChange={(v) => setForm((prev) => ({ ...prev, driver: v }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {driversList?.map((d) => (
+                            <SelectItem key={d.id} value={d.id}>
+                              {d.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
-                  <div className="space-y-2">
-                    <Label>Posto</Label>
-                    <Select value={form.station} onValueChange={(v) => setForm((prev) => ({ ...prev, station: v }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stationsList?.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {isAdmin && (
+                    <div className="space-y-2">
+                      <Label>Posto</Label>
+                      <Select value={form.station} onValueChange={(v) => setForm((prev) => ({ ...prev, station: v }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {stationsList?.map((s) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
-                  <div className="space-y-2">
-                    <Label>Centro de Custo</Label>
-                    <Select value={form.cost_center} onValueChange={(v) => setForm((prev) => ({ ...prev, cost_center: v }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {costCentersList?.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {isAdmin && (
+                    <div className="space-y-2">
+                      <Label>Centro de Custo</Label>
+                      <Select value={form.cost_center} onValueChange={(v) => setForm((prev) => ({ ...prev, cost_center: v }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Selecione..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {costCentersList?.map((c) => (
+                            <SelectItem key={c.id} value={c.id}>
+                              {c.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   <div className="space-y-2">
                     <Label>Data/Hora *</Label>
@@ -331,21 +384,28 @@ export function TransactionsPage() {
 
                   <div className="space-y-2">
                     <Label>Tipo de Combustível *</Label>
-                    <Select
-                      value={form.fuel_type}
-                      onValueChange={(v) => setForm((prev) => ({ ...prev, fuel_type: v as FuelType }))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {FUEL_TYPES.map((ft) => (
-                          <SelectItem key={ft.value} value={ft.value}>
-                            {ft.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    {isAdmin ? (
+                      <Select
+                        value={form.fuel_type}
+                        onValueChange={(v) => setForm((prev) => ({ ...prev, fuel_type: v as FuelType }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {FUEL_TYPES.map((ft) => (
+                            <SelectItem key={ft.value} value={ft.value}>
+                              {ft.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        value={FUEL_TYPES.find((ft) => ft.value === form.fuel_type)?.label || form.fuel_type}
+                        disabled
+                      />
+                    )}
                   </div>
 
                   <div className="space-y-2">

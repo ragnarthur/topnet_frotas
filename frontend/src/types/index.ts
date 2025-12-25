@@ -44,6 +44,8 @@ export interface Driver extends BaseModel {
   doc_id: string
   phone: string
   active: boolean
+  current_vehicle: string | null
+  current_vehicle_detail?: VehicleList | null
 }
 
 export interface DriverList {
@@ -52,6 +54,8 @@ export interface DriverList {
   doc_id: string
   phone: string
   active: boolean
+  current_vehicle: string | null
+  current_vehicle_detail?: VehicleList | null
 }
 
 // Cost Center
@@ -241,7 +245,6 @@ export interface PaginatedResponse<T> {
 // Auth
 export interface TokenResponse {
   access: string
-  refresh: string
 }
 
 export interface User {

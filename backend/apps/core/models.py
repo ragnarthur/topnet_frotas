@@ -1,5 +1,6 @@
 import uuid
 
+from django.conf import settings
 from django.db import models
 
 
@@ -93,6 +94,22 @@ class Vehicle(BaseModel):
 
 class Driver(BaseModel):
     """Driver model."""
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='driver_profile',
+        verbose_name='Usuário'
+    )
+    current_vehicle = models.ForeignKey(
+        Vehicle,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='current_drivers',
+        verbose_name='Veículo Atual'
+    )
     name = models.CharField('Nome', max_length=200)
     doc_id = models.CharField('CPF/RG', max_length=20, blank=True)
     phone = models.CharField('Telefone', max_length=20, blank=True)

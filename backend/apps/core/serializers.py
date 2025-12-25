@@ -50,18 +50,31 @@ class VehicleListSerializer(serializers.ModelSerializer):
 
 class DriverSerializer(serializers.ModelSerializer):
     name = SanitizedCharField(max_length=200)
+    current_vehicle = serializers.PrimaryKeyRelatedField(
+        queryset=Vehicle.objects.all(),
+        required=False,
+        allow_null=True
+    )
+    current_vehicle_detail = VehicleListSerializer(source='current_vehicle', read_only=True)
 
     class Meta:
         model = Driver
-        fields = ['id', 'name', 'doc_id', 'phone', 'active', 'created_at', 'updated_at']
+        fields = [
+            'id', 'name', 'doc_id', 'phone', 'active',
+            'current_vehicle', 'current_vehicle_detail',
+            'created_at', 'updated_at'
+        ]
         read_only_fields = ['id', 'created_at', 'updated_at']
 
 
 class DriverListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for lists and dropdowns."""
+    current_vehicle = serializers.PrimaryKeyRelatedField(read_only=True)
+    current_vehicle_detail = VehicleListSerializer(source='current_vehicle', read_only=True)
+
     class Meta:
         model = Driver
-        fields = ['id', 'name', 'doc_id', 'phone', 'active']
+        fields = ['id', 'name', 'doc_id', 'phone', 'active', 'current_vehicle', 'current_vehicle_detail']
 
 
 class CostCenterSerializer(serializers.ModelSerializer):

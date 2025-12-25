@@ -19,9 +19,11 @@ import type {
   Vehicle,
   VehicleList,
 } from '@/types'
+import { tokenStore } from '@/lib/tokenStore'
 
 const api = axios.create({
   baseURL: '/api',
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -29,7 +31,7 @@ const api = axios.create({
 
 // Auth interceptor
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token')
+  const token = tokenStore.getAccess()
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
@@ -43,24 +45,74 @@ api.interceptors.response.use(
     const originalRequest = error.config
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
-      const refresh = localStorage.getItem('refresh_token')
-      if (refresh) {
-        try {
-          const response = await axios.post('/api/auth/token/refresh/', { refresh })
-          const { access } = response.data
-          localStorage.setItem('access_token', access)
-          originalRequest.headers.Authorization = `Bearer ${access}`
-          return api(originalRequest)
-        } catch {
-          localStorage.removeItem('access_token')
-          localStorage.removeItem('refresh_token')
-          window.location.href = '/login'
-        }
+      try {
+        const response = await axios.post(
+          '/api/auth/token/refresh/',
+          {},
+          { withCredentials: true }
+        )
+        const { access } = response.data
+        tokenStore.setAccess(access)
+        originalRequest.headers.Authorization = `Bearer ${access}`
+        return api(originalRequest)
+      } catch {
+        tokenStore.clear()
+        window.location.href = '/login'
       }
     }
     return Promise.reject(error)
   }
 )
+
+// User profile type
+export interface UserProfile {
+  id: number
+  username: string
+  email: string
+  first_name: string
+  last_name: string
+  role: 'admin' | 'driver' | null
+  is_admin: boolean
+  is_driver: boolean
+  driver?: {
+    id: string
+    name: string
+    phone: string
+    current_vehicle?: {
+      id: string
+      name: string
+      plate: string
+      fuel_type: FuelType
+    } | null
+  }
+}
+
+// Driver Dashboard type
+export interface DriverDashboard {
+  driver: {
+    id: string
+    name: string
+  }
+  period: {
+    from: string
+    to: string
+  }
+  stats: {
+    total_liters: string
+    total_cost: string
+    transaction_count: number
+    avg_km_per_liter: number | null
+  }
+  recent_transactions: Array<{
+    id: string
+    vehicle__name: string
+    vehicle__plate: string
+    purchased_at: string
+    liters: string
+    total_cost: string
+    odometer_km: number
+  }>
+}
 
 // Auth
 export const auth = {
@@ -68,8 +120,23 @@ export const auth = {
     const response = await api.post('/auth/token/', { username, password })
     return response.data
   },
-  refresh: async (refresh: string): Promise<{ access: string }> => {
-    const response = await api.post('/auth/token/refresh/', { refresh })
+  refresh: async (): Promise<{ access: string }> => {
+    const response = await api.post('/auth/token/refresh/', {})
+    return response.data
+  },
+  logout: async (): Promise<void> => {
+    await api.post('/auth/logout/', {})
+  },
+  profile: async (): Promise<UserProfile> => {
+    const response = await api.get('/auth/profile/')
+    return response.data
+  },
+}
+
+// Driver Dashboard
+export const driverDashboard = {
+  get: async (): Promise<DriverDashboard> => {
+    const response = await api.get('/dashboard/driver/')
     return response.data
   },
 }

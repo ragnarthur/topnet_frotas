@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { motion, AnimatePresence } from 'framer-motion'
-import { AlertTriangle, ArrowRight, Droplets, Fuel, TrendingUp } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Droplets, Globe, TrendingUp } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -64,9 +64,9 @@ export function LoginPage() {
   return (
     <div className="relative min-h-screen overflow-hidden">
       <div className="absolute inset-0 gradient-bg" />
-      <div className="absolute -top-40 -left-10 h-72 w-72 rounded-full bg-cyan-500/20 blur-[120px]" />
-      <div className="absolute top-10 right-0 h-96 w-96 rounded-full bg-violet-500/20 blur-[140px]" />
-      <div className="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-emerald-500/10 blur-[140px]" />
+      <div className="absolute -top-40 -left-10 h-72 w-72 rounded-full bg-sky-500/20 blur-[120px]" />
+      <div className="absolute top-10 right-0 h-96 w-96 rounded-full bg-blue-500/20 blur-[140px]" />
+      <div className="absolute bottom-0 left-1/3 h-80 w-80 rounded-full bg-sky-500/10 blur-[140px]" />
 
       <motion.div
         variants={containerVariants}
@@ -95,7 +95,7 @@ export function LoginPage() {
                 >
                   <div className="flex items-center gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10">
-                      <item.icon className="h-5 w-5 text-cyan-300" />
+                      <item.icon className="h-5 w-5 text-sky-300" />
                     </div>
                     <div>
                       <p className="text-sm font-semibold">{item.title}</p>
@@ -112,12 +112,21 @@ export function LoginPage() {
             className="glass-card rounded-2xl border border-white/10 p-8"
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 to-cyan-500 shadow-lg">
-                <Fuel className="h-6 w-6 text-white" />
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-sky-500 shadow-lg globe-pulse">
+                <Globe className="h-6 w-6 text-white" />
               </div>
-              <div>
+              <div className="flex flex-col">
                 <p className="text-sm text-muted-foreground">Bem-vindo</p>
-                <h2 className="text-2xl font-bold">TopNet Frotas</h2>
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col">
+                    <div>
+                      <span className="text-2xl font-bold text-white">Top</span>
+                      <span className="text-2xl font-bold text-blue-400">NET</span>
+                    </div>
+                    <span className="text-[8px] tracking-[0.2em] text-muted-foreground uppercase">Internet Banda Larga</span>
+                  </div>
+                  <span className="text-2xl font-bold text-foreground">Frotas</span>
+                </div>
               </div>
             </div>
             <p className="mt-3 text-sm text-muted-foreground">
@@ -166,7 +175,7 @@ export function LoginPage() {
               </AnimatePresence>
               <Button
                 type="submit"
-                className="w-full bg-gradient-to-r from-violet-500 to-cyan-500 text-white hover:from-violet-400 hover:to-cyan-400"
+                className="w-full bg-gradient-to-r from-blue-500 to-sky-500 text-white hover:from-blue-400 hover:to-sky-400"
                 disabled={loading}
               >
                 {loading ? (

@@ -4,6 +4,8 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.users.permissions import IsAdminUser
+
 from .models import Alert
 from .serializers import AlertListSerializer, AlertSerializer
 
@@ -28,6 +30,7 @@ class AlertFilter(filters.FilterSet):
 
 class AlertViewSet(viewsets.ModelViewSet):
     queryset = Alert.objects.select_related('vehicle', 'fuel_transaction').all()
+    permission_classes = [IsAdminUser]
     filterset_class = AlertFilter
     search_fields = ['vehicle__name', 'vehicle__plate', 'message']
     ordering_fields = ['created_at', 'severity', 'type']

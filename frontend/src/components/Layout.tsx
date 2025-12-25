@@ -12,20 +12,29 @@ import {
   Menu,
   X,
   ChevronRight,
+  User,
+  Globe,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 
-const navigation = [
+interface NavItem {
+  name: string
+  href: string
+  icon: typeof LayoutDashboard
+  adminOnly?: boolean
+}
+
+const allNavigation: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Abastecimentos', href: '/abastecimentos', icon: Fuel },
-  { name: 'Veículos', href: '/veiculos', icon: Car },
-  { name: 'Motoristas', href: '/motoristas', icon: Users },
-  { name: 'Centros de Custo', href: '/centros-custo', icon: Building2 },
-  { name: 'Postos', href: '/postos', icon: MapPin },
-  { name: 'Alertas', href: '/alertas', icon: AlertTriangle },
+  { name: 'Veículos', href: '/veiculos', icon: Car, adminOnly: true },
+  { name: 'Motoristas', href: '/motoristas', icon: Users, adminOnly: true },
+  { name: 'Centros de Custo', href: '/centros-custo', icon: Building2, adminOnly: true },
+  { name: 'Postos', href: '/postos', icon: MapPin, adminOnly: true },
+  { name: 'Alertas', href: '/alertas', icon: AlertTriangle, adminOnly: true },
 ]
 
 interface LayoutProps {
@@ -34,15 +43,23 @@ interface LayoutProps {
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation()
-  const { logout } = useAuth()
+  const { logout, user, isAdmin } = useAuth()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+
+  // Filter navigation based on user role
+  const navigation = useMemo(() => {
+    if (isAdmin) {
+      return allNavigation
+    }
+    return allNavigation.filter((item) => !item.adminOnly)
+  }, [isAdmin])
 
   return (
     <div className="flex h-screen overflow-hidden gradient-bg">
       {/* Background effects */}
       <div className="fixed inset-0 -z-10">
-        <div className="absolute top-0 -left-40 w-80 h-80 bg-violet-600/30 rounded-full blur-[100px]" />
-        <div className="absolute bottom-0 -right-40 w-80 h-80 bg-cyan-600/30 rounded-full blur-[100px]" />
+        <div className="absolute top-0 -left-40 w-80 h-80 bg-blue-600/30 rounded-full blur-[100px]" />
+        <div className="absolute bottom-0 -right-40 w-80 h-80 bg-sky-600/30 rounded-full blur-[100px]" />
       </div>
 
       {/* Desktop Sidebar */}
@@ -54,12 +71,18 @@ export function Layout({ children }: LayoutProps) {
       >
         {/* Logo */}
         <div className="flex h-20 items-center gap-3 px-6 border-b border-white/10">
-          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500 shadow-lg glow">
-            <Fuel className="h-5 w-5 text-white" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-sky-500 shadow-lg glow globe-pulse">
+            <Globe className="h-5 w-5 text-white" />
           </div>
-          <div>
-            <span className="text-lg font-bold gradient-text">TopNet</span>
-            <span className="text-lg font-bold text-foreground"> Frotas</span>
+          <div className="flex items-center gap-2">
+            <div className="flex flex-col">
+              <div>
+                <span className="text-lg font-bold text-white">Top</span>
+                <span className="text-lg font-bold text-blue-400">NET</span>
+              </div>
+              <span className="text-[8px] tracking-[0.2em] text-muted-foreground uppercase">Internet Banda Larga</span>
+            </div>
+            <span className="text-lg font-bold text-foreground">Frotas</span>
           </div>
         </div>
 
@@ -79,7 +102,7 @@ export function Layout({ children }: LayoutProps) {
                   className={cn(
                     'group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-300',
                     isActive
-                      ? 'bg-gradient-to-r from-violet-500/20 to-cyan-500/20 text-white border border-violet-500/30 shadow-lg shadow-violet-500/10'
+                      ? 'bg-gradient-to-r from-blue-500/20 to-sky-500/20 text-white border border-blue-500/30 shadow-lg shadow-blue-500/10'
                       : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
                   )}
                 >
@@ -87,7 +110,7 @@ export function Layout({ children }: LayoutProps) {
                     className={cn(
                       'flex items-center justify-center w-9 h-9 rounded-lg transition-all duration-300',
                       isActive
-                        ? 'bg-gradient-to-br from-violet-500 to-cyan-500 text-white shadow-lg'
+                        ? 'bg-gradient-to-br from-blue-500 to-sky-500 text-white shadow-lg'
                         : 'bg-white/5 text-muted-foreground group-hover:bg-white/10 group-hover:text-foreground'
                     )}
                   >
@@ -97,7 +120,7 @@ export function Layout({ children }: LayoutProps) {
                   {isActive && (
                     <motion.div
                       layoutId="activeIndicator"
-                      className="w-1.5 h-1.5 rounded-full bg-cyan-400"
+                      className="w-1.5 h-1.5 rounded-full bg-sky-400"
                     />
                   )}
                 </Link>
@@ -107,7 +130,22 @@ export function Layout({ children }: LayoutProps) {
         </nav>
 
         {/* User section */}
-        <div className="p-4 border-t border-white/10">
+        <div className="p-4 border-t border-white/10 space-y-2">
+          {user && (
+            <div className="flex items-center gap-3 px-4 py-3">
+              <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/20 to-sky-500/20 border border-blue-500/30">
+                <User className="h-4 w-4 text-blue-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground truncate">
+                  {user.first_name || user.username}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isAdmin ? 'Administrador' : 'Motorista'}
+                </p>
+              </div>
+            </div>
+          )}
           <Button
             variant="ghost"
             className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl py-6"
@@ -153,12 +191,18 @@ export function Layout({ children }: LayoutProps) {
             >
               {/* Logo */}
               <div className="flex h-20 items-center gap-3 px-6 border-b border-white/10">
-                <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500">
-                  <Fuel className="h-5 w-5 text-white" />
+                <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-sky-500">
+                  <Globe className="h-5 w-5 text-white" />
                 </div>
-                <div>
-                  <span className="text-lg font-bold gradient-text">TopNet</span>
-                  <span className="text-lg font-bold text-foreground"> Frotas</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-col">
+                    <div>
+                      <span className="text-lg font-bold text-white">Top</span>
+                      <span className="text-lg font-bold text-blue-400">NET</span>
+                    </div>
+                    <span className="text-[8px] tracking-[0.2em] text-muted-foreground uppercase">Internet Banda Larga</span>
+                  </div>
+                  <span className="text-lg font-bold text-foreground">Frotas</span>
                 </div>
               </div>
 
@@ -174,7 +218,7 @@ export function Layout({ children }: LayoutProps) {
                       className={cn(
                         'group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all duration-300',
                         isActive
-                          ? 'bg-gradient-to-r from-violet-500/20 to-cyan-500/20 text-white border border-violet-500/30'
+                          ? 'bg-gradient-to-r from-blue-500/20 to-sky-500/20 text-white border border-blue-500/30'
                           : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
                       )}
                     >
@@ -187,7 +231,22 @@ export function Layout({ children }: LayoutProps) {
               </nav>
 
               {/* User section */}
-              <div className="p-4 border-t border-white/10">
+              <div className="p-4 border-t border-white/10 space-y-2">
+                {user && (
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <div className="flex items-center justify-center w-9 h-9 rounded-lg bg-gradient-to-br from-blue-500/20 to-sky-500/20 border border-blue-500/30">
+                      <User className="h-4 w-4 text-blue-400" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {user.first_name || user.username}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {isAdmin ? 'Administrador' : 'Motorista'}
+                      </p>
+                    </div>
+                  </div>
+                )}
                 <Button
                   variant="ghost"
                   className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground rounded-xl"

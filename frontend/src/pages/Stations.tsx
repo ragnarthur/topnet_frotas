@@ -174,7 +174,7 @@ export function StationsPage() {
         </div>
         <Button
           onClick={openCreateDialog}
-          className="bg-gradient-to-r from-violet-500 to-cyan-500 hover:from-violet-400 hover:to-cyan-400"
+          className="bg-gradient-to-r from-blue-500 to-sky-500 hover:from-blue-400 hover:to-sky-400"
         >
           <Plus className="mr-2 h-4 w-4" />
           Novo Posto
@@ -212,8 +212,8 @@ export function StationsPage() {
                     <TableRow key={station.id}>
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500/20 to-cyan-500/20">
-                            <Fuel className="h-4 w-4 text-violet-400" />
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-500/20 to-sky-500/20">
+                            <Fuel className="h-4 w-4 text-blue-400" />
                           </div>
                           {station.name}
                         </div>
@@ -235,7 +235,7 @@ export function StationsPage() {
                             variant="ghost"
                             size="icon"
                             onClick={() => fuelStations.get(station.id).then(openEditDialog)}
-                            className="hover:bg-violet-500/20"
+                            className="hover:bg-blue-500/20"
                           >
                             <Pencil className="h-4 w-4" />
                           </Button>
@@ -263,7 +263,7 @@ export function StationsPage() {
         <DialogContent className="glass-card border-white/10 sm:max-w-[450px]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-cyan-500">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-sky-500">
                 <Fuel className="h-5 w-5 text-white" />
               </div>
               {editingStation ? 'Editar Posto' : 'Novo Posto'}
@@ -337,7 +337,7 @@ export function StationsPage() {
               <Button
                 type="submit"
                 disabled={isSubmitting}
-                className="bg-gradient-to-r from-violet-500 to-cyan-500 hover:from-violet-400 hover:to-cyan-400"
+                className="bg-gradient-to-r from-blue-500 to-sky-500 hover:from-blue-400 hover:to-sky-400"
               >
                 {isSubmitting ? 'Salvando...' : editingStation ? 'Atualizar' : 'Criar'}
               </Button>

@@ -39,7 +39,7 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 }
 }
 
-const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
+const COLORS = ['#3b82f6', '#38bdf8', '#10b981', '#f59e0b', '#ef4444']
 
 export function DashboardPage() {
   const queryClient = useQueryClient()
@@ -139,18 +139,18 @@ export function DashboardPage() {
           value={formatCurrency(data.summary.total_cost)}
           subtitle={`${data.summary.transaction_count} abastecimentos`}
           icon={DollarSign}
-          tag="Período atual"
+          tag="Periodo atual"
           tagTone="default"
-          color="violet"
+          color="blue"
         />
         <StatCard
           title="Total de Litros"
           value={`${formatNumber(data.summary.total_liters)} L`}
-          subtitle={`Média: ${formatCurrency(avgCostPerLiter)}/L`}
+          subtitle={`Media: ${formatCurrency(avgCostPerLiter)}/L`}
           icon={Droplets}
-          tag="Média calculada"
+          tag="Media calculada"
           tagTone="default"
-          color="cyan"
+          color="sky"
         />
         <StatCard
           title="Veículos Ativos"
@@ -250,16 +250,16 @@ export function DashboardPage() {
         <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-lg font-semibold">Evolução Mensal</h3>
+              <h3 className="text-lg font-semibold">Evolucao Mensal</h3>
               <p className="text-sm text-muted-foreground">Custo e consumo</p>
             </div>
             <div className="flex items-center gap-4 text-sm">
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-violet-500" />
+                <div className="w-3 h-3 rounded-full bg-blue-500" />
                 <span className="text-muted-foreground">Custo</span>
               </div>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-cyan-500" />
+                <div className="w-3 h-3 rounded-full bg-sky-500" />
                 <span className="text-muted-foreground">Litros</span>
               </div>
             </div>
@@ -270,12 +270,12 @@ export function DashboardPage() {
                 <AreaChart data={monthlyData}>
                   <defs>
                     <linearGradient id="colorCusto" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
                     </linearGradient>
                     <linearGradient id="colorLitros" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
+                      <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#38bdf8" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
@@ -309,7 +309,7 @@ export function DashboardPage() {
                   <Area
                     type="monotone"
                     dataKey="custo"
-                    stroke="#8b5cf6"
+                    stroke="#3b82f6"
                     strokeWidth={2}
                     fillOpacity={1}
                     fill="url(#colorCusto)"
@@ -317,7 +317,7 @@ export function DashboardPage() {
                   <Area
                     type="monotone"
                     dataKey="litros"
-                    stroke="#06b6d4"
+                    stroke="#38bdf8"
                     strokeWidth={2}
                     fillOpacity={1}
                     fill="url(#colorLitros)"
@@ -434,14 +434,14 @@ export function DashboardPage() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     {vehicle.km_per_liter ? (
-                      <span className="text-cyan-400">{formatNumber(vehicle.km_per_liter)}</span>
+                      <span className="text-sky-400">{formatNumber(vehicle.km_per_liter)}</span>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
                   </td>
                   <td className="px-6 py-4 text-right">
                     {vehicle.cost_per_km ? (
-                      <span className="text-violet-400">{formatCurrency(vehicle.cost_per_km)}</span>
+                      <span className="text-blue-400">{formatCurrency(vehicle.cost_per_km)}</span>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
@@ -504,7 +504,7 @@ interface StatCardProps {
   value: string
   subtitle: string
   icon: React.ElementType
-  color: 'violet' | 'cyan' | 'emerald' | 'red'
+  color: 'blue' | 'sky' | 'emerald' | 'red'
   alert?: boolean
   tag?: string
   tagTone?: 'default' | 'success' | 'warning' | 'danger'
@@ -512,8 +512,8 @@ interface StatCardProps {
 
 function StatCard({ title, value, subtitle, icon: Icon, color, alert, tag, tagTone = 'default' }: StatCardProps) {
   const iconBgClasses = {
-    violet: 'from-violet-500 to-violet-600',
-    cyan: 'from-cyan-500 to-cyan-600',
+    blue: 'from-blue-500 to-blue-600',
+    sky: 'from-sky-500 to-sky-600',
     emerald: 'from-emerald-500 to-emerald-600',
     red: 'from-red-500 to-red-600',
   }
