@@ -1,9 +1,20 @@
 from rest_framework import serializers
 
 from .models import CostCenter, Driver, FuelStation, Vehicle
+from .utils import sanitize_text_field
+
+
+class SanitizedCharField(serializers.CharField):
+    """CharField that sanitizes input to prevent XSS."""
+
+    def to_internal_value(self, data):
+        value = super().to_internal_value(data)
+        return sanitize_text_field(value)
 
 
 class VehicleSerializer(serializers.ModelSerializer):
+    name = SanitizedCharField(max_length=100)
+    model = SanitizedCharField(max_length=100)
     last_odometer = serializers.IntegerField(read_only=True)
     usage_category_display = serializers.CharField(
         source='get_usage_category_display',
@@ -38,6 +49,8 @@ class VehicleListSerializer(serializers.ModelSerializer):
 
 
 class DriverSerializer(serializers.ModelSerializer):
+    name = SanitizedCharField(max_length=200)
+
     class Meta:
         model = Driver
         fields = ['id', 'name', 'doc_id', 'phone', 'active', 'created_at', 'updated_at']
@@ -48,10 +61,11 @@ class DriverListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for lists and dropdowns."""
     class Meta:
         model = Driver
-        fields = ['id', 'name', 'active']
+        fields = ['id', 'name', 'doc_id', 'phone', 'active']
 
 
 class CostCenterSerializer(serializers.ModelSerializer):
+    name = SanitizedCharField(max_length=100)
     category_display = serializers.CharField(
         source='get_category_display',
         read_only=True
@@ -76,6 +90,10 @@ class CostCenterListSerializer(serializers.ModelSerializer):
 
 
 class FuelStationSerializer(serializers.ModelSerializer):
+    name = SanitizedCharField(max_length=200)
+    city = SanitizedCharField(max_length=100, required=False, allow_blank=True)
+    address = SanitizedCharField(max_length=300, required=False, allow_blank=True)
+
     class Meta:
         model = FuelStation
         fields = ['id', 'name', 'city', 'address', 'active', 'created_at', 'updated_at']
@@ -86,4 +104,4 @@ class FuelStationListSerializer(serializers.ModelSerializer):
     """Lightweight serializer for lists and dropdowns."""
     class Meta:
         model = FuelStation
-        fields = ['id', 'name', 'city', 'active']
+        fields = ['id', 'name', 'city', 'address', 'active']
