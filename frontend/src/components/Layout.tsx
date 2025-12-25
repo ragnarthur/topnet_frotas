@@ -49,39 +49,93 @@ export function Layout({ children }: LayoutProps) {
   const { logout, user, isAdmin } = useAuth()
   const queryClient = useQueryClient()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'online' | 'offline'>('connecting')
 
   useEffect(() => {
     if (!isAdmin) {
       return
     }
 
-    const token = tokenStore.getAccess()
-    if (!token) {
-      return
+    let source: EventSource | null = null
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null
+    let stopped = false
+
+    const pushEvent = (payload: Record<string, unknown>) => {
+      const eventId = String(payload.event_id ?? `${payload.type || 'event'}-${payload.timestamp || Date.now()}`)
+      const nextEvent = {
+        id: eventId,
+        type: String(payload.type || 'EVENT'),
+        timestamp: String(payload.timestamp || new Date().toISOString()),
+        payload,
+      }
+      queryClient.setQueryData(
+        ['realtime-events'],
+        (old: Array<typeof nextEvent> = []) => [nextEvent, ...old].slice(0, 20)
+      )
     }
 
-    const source = new EventSource(`/api/events/stream/?token=${encodeURIComponent(token)}`)
+    const connect = () => {
+      const token = tokenStore.getAccess()
+      if (!token) {
+        setRealtimeStatus('offline')
+        return
+      }
 
-    source.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data)
-        if (payload?.type === 'FUEL_TRANSACTION_CREATED') {
-          toast.info('Novo abastecimento registrado')
-          queryClient.invalidateQueries({ queryKey: ['fuel-transactions'] })
-          queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-          queryClient.invalidateQueries({ queryKey: ['alerts'] })
-        } else if (payload?.type === 'FUEL_TRANSACTION_UPDATED') {
-          queryClient.invalidateQueries({ queryKey: ['fuel-transactions'] })
-          queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-          queryClient.invalidateQueries({ queryKey: ['alerts'] })
+      setRealtimeStatus('connecting')
+      source = new EventSource(`/api/events/stream/?token=${encodeURIComponent(token)}`)
+
+      source.onopen = () => {
+        setRealtimeStatus('online')
+      }
+
+      source.onerror = () => {
+        setRealtimeStatus('offline')
+        source?.close()
+        if (!stopped) {
+          reconnectTimer = setTimeout(connect, 3000)
         }
-      } catch {
-        // Ignore malformed events
+      }
+
+      source.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data)
+          pushEvent(payload)
+
+          if (payload?.type === 'FUEL_TRANSACTION_CREATED') {
+            toast.info('Novo abastecimento registrado')
+            queryClient.invalidateQueries({ queryKey: ['fuel-transactions'] })
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+            queryClient.invalidateQueries({ queryKey: ['alerts'] })
+          } else if (payload?.type === 'FUEL_TRANSACTION_UPDATED') {
+            queryClient.invalidateQueries({ queryKey: ['fuel-transactions'] })
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+            queryClient.invalidateQueries({ queryKey: ['alerts'] })
+          } else if (payload?.type === 'ALERT_CREATED') {
+            toast.warning(`Novo alerta (${payload.alert_count ?? 1})`)
+            queryClient.invalidateQueries({ queryKey: ['alerts'] })
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+          } else if (payload?.type === 'ALERT_RESOLVED' || payload?.type === 'ALERT_RESOLVED_BULK') {
+            queryClient.invalidateQueries({ queryKey: ['alerts'] })
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+          } else if (payload?.type === 'FUEL_PRICE_UPDATED') {
+            queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+          }
+        } catch {
+          // Ignore malformed events
+        }
       }
     }
 
+    connect()
+
     return () => {
-      source.close()
+      stopped = true
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer)
+      }
+      if (source) {
+        source.close()
+      }
     }
   }, [isAdmin, queryClient])
 
@@ -185,6 +239,19 @@ export function Layout({ children }: LayoutProps) {
               </div>
             </div>
           )}
+          {isAdmin && (
+            <div className="flex items-center gap-2 px-4 py-1 text-xs text-muted-foreground">
+              <span
+                className={cn(
+                  'h-2 w-2 rounded-full',
+                  realtimeStatus === 'online' && 'bg-emerald-400',
+                  realtimeStatus === 'connecting' && 'bg-yellow-400',
+                  realtimeStatus === 'offline' && 'bg-red-400'
+                )}
+              />
+              Tempo real: {realtimeStatus === 'online' ? 'online' : realtimeStatus === 'connecting' ? 'conectando' : 'offline'}
+            </div>
+          )}
           <Button
             variant="ghost"
             className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground hover:bg-white/5 rounded-xl py-6"
@@ -280,10 +347,23 @@ export function Layout({ children }: LayoutProps) {
                       <p className="text-sm font-medium text-foreground truncate">
                         {user.first_name || user.username}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        {isAdmin ? 'Administrador' : 'Motorista'}
-                      </p>
+                        <p className="text-xs text-muted-foreground">
+                          {isAdmin ? 'Administrador' : 'Motorista'}
+                        </p>
+                      </div>
                     </div>
+                  )}
+                {isAdmin && (
+                  <div className="flex items-center gap-2 px-4 py-1 text-xs text-muted-foreground">
+                    <span
+                      className={cn(
+                        'h-2 w-2 rounded-full',
+                        realtimeStatus === 'online' && 'bg-emerald-400',
+                        realtimeStatus === 'connecting' && 'bg-yellow-400',
+                        realtimeStatus === 'offline' && 'bg-red-400'
+                      )}
+                    />
+                    Tempo real: {realtimeStatus === 'online' ? 'online' : realtimeStatus === 'connecting' ? 'conectando' : 'offline'}
                   </div>
                 )}
                 <Button

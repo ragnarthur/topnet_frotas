@@ -22,7 +22,7 @@ import {
 } from 'lucide-react'
 import { dashboard, fuelPrices } from '@/api/client'
 import { toast } from 'sonner'
-import { formatCurrency, formatNumber } from '@/lib/utils'
+import { formatCurrency, formatDateTime, formatNumber } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
@@ -46,6 +46,12 @@ export function DashboardPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => dashboard.summary(),
+  })
+  const { data: realtimeEvents = [] } = useQuery({
+    queryKey: ['realtime-events'],
+    queryFn: async () => [],
+    enabled: false,
+    initialData: [],
   })
   const fetchANPMutation = useMutation({
     mutationFn: () => fuelPrices.fetchANP(),
@@ -171,6 +177,46 @@ export function DashboardPage() {
           tag={data.alerts.open_count > 0 ? 'Atencao' : 'Sem alertas'}
           tagTone={data.alerts.open_count > 0 ? 'danger' : 'success'}
         />
+      </motion.div>
+
+      {/* Realtime Activity */}
+      <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-lg font-semibold">Atividade em Tempo Real</h3>
+            <p className="text-sm text-muted-foreground">Atualizações recentes do sistema</p>
+          </div>
+          <Badge variant="secondary">live</Badge>
+        </div>
+        {realtimeEvents.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Nenhuma atividade recente registrada.
+          </p>
+        ) : (
+          <div className="space-y-3">
+            {realtimeEvents.slice(0, 6).map((event: any) => (
+              <div key={event.id} className="flex items-start justify-between gap-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                <div>
+                  <p className="text-sm font-medium">
+                    {event.type === 'FUEL_TRANSACTION_CREATED' && 'Novo abastecimento registrado'}
+                    {event.type === 'FUEL_TRANSACTION_UPDATED' && 'Abastecimento atualizado'}
+                    {event.type === 'ALERT_CREATED' && `Novo alerta (${event.payload?.alert_count ?? 1})`}
+                    {event.type === 'ALERT_RESOLVED' && 'Alerta resolvido'}
+                    {event.type === 'ALERT_RESOLVED_BULK' && 'Alertas resolvidos em lote'}
+                    {event.type === 'FUEL_PRICE_UPDATED' && 'Preço de combustível atualizado'}
+                    {!['FUEL_TRANSACTION_CREATED', 'FUEL_TRANSACTION_UPDATED', 'ALERT_CREATED', 'ALERT_RESOLVED', 'ALERT_RESOLVED_BULK', 'FUEL_PRICE_UPDATED'].includes(event.type) && 'Evento recebido'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {event.payload?.total_cost ? `Valor: ${formatCurrency(Number(event.payload.total_cost))}` : 'Atualização em tempo real'}
+                  </p>
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {formatDateTime(event.timestamp)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </motion.div>
 
       {/* National Average Reference */}

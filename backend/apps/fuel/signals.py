@@ -14,6 +14,7 @@ from django.dispatch import receiver
 
 from apps.alerts.models import Alert, AlertSeverity, AlertType
 from apps.core.models import UsageCategory
+from apps.core.realtime import publish_event
 
 from .models import FuelPriceSnapshot, FuelPriceSource, FuelTransaction
 
@@ -29,7 +30,7 @@ def update_fuel_price_snapshot(sender, instance, created, **kwargs):
     try:
         # Update station-specific snapshot if station is set (pump price reference)
         if instance.station_id:
-            FuelPriceSnapshot.objects.update_or_create(
+            snapshot, _ = FuelPriceSnapshot.objects.update_or_create(
                 fuel_type=instance.fuel_type,
                 station_id=instance.station_id,
                 defaults={
@@ -38,6 +39,13 @@ def update_fuel_price_snapshot(sender, instance, created, **kwargs):
                     'source': FuelPriceSource.LAST_TRANSACTION,
                 }
             )
+            publish_event({
+                'type': 'FUEL_PRICE_UPDATED',
+                'fuel_type': snapshot.fuel_type,
+                'station_id': str(snapshot.station_id) if snapshot.station_id else None,
+                'price_per_liter': str(snapshot.price_per_liter),
+                'source': snapshot.source,
+            })
 
         logger.info(
             f"Updated fuel price snapshot: {instance.fuel_type} = R$ {instance.unit_price}"
@@ -143,6 +151,17 @@ def generate_consistency_alerts(sender, instance, created, **kwargs):
     # Bulk create alerts
     if alerts_to_create:
         Alert.objects.bulk_create(alerts_to_create)
+        severity_counts = {}
+        for alert in alerts_to_create:
+            severity_counts[alert.severity] = severity_counts.get(alert.severity, 0) + 1
+
+        publish_event({
+            'type': 'ALERT_CREATED',
+            'alert_count': len(alerts_to_create),
+            'severity_counts': severity_counts,
+            'vehicle_id': str(vehicle.id),
+            'transaction_id': str(instance.id),
+        })
         logger.info(f"Created {len(alerts_to_create)} alerts for transaction {instance.id}")
 
 
@@ -153,18 +172,6 @@ def publish_transaction_event(sender, instance, created, **kwargs):
     This is optional and only runs if Redis is available.
     """
     try:
-        import json
-
-        import redis
-        from django.conf import settings
-
-        redis_url = getattr(settings, 'CELERY_BROKER_URL', None)
-        channel = getattr(settings, 'REDIS_PUBSUB_CHANNEL', 'fleetfuel.events')
-
-        if not redis_url:
-            return
-
-        r = redis.from_url(redis_url)
         event = {
             'type': 'FUEL_TRANSACTION_CREATED' if created else 'FUEL_TRANSACTION_UPDATED',
             'transaction_id': str(instance.id),
@@ -172,9 +179,7 @@ def publish_transaction_event(sender, instance, created, **kwargs):
             'purchased_at': instance.purchased_at.isoformat(),
             'total_cost': str(instance.total_cost),
         }
-        r.publish(channel, json.dumps(event))
+        publish_event(event)
         logger.debug(f"Published event to Redis: {event['type']}")
-    except ImportError:
-        pass  # Redis not installed
     except Exception as e:
         logger.warning(f"Could not publish to Redis: {e}")

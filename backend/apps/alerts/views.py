@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.users.permissions import IsAdminUser
+from apps.core.realtime import publish_event
 
 from .models import Alert
 from .serializers import AlertListSerializer, AlertSerializer
@@ -51,6 +52,11 @@ class AlertViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST
             )
         alert.resolve()
+        publish_event({
+            'type': 'ALERT_RESOLVED',
+            'alert_id': str(alert.id),
+            'vehicle_id': str(alert.vehicle_id),
+        })
         serializer = AlertSerializer(alert)
         return Response(serializer.data)
 
@@ -68,6 +74,12 @@ class AlertViewSet(viewsets.ModelViewSet):
             id__in=alert_ids,
             resolved_at__isnull=True
         ).update(resolved_at=timezone.now())
+
+        if updated:
+            publish_event({
+                'type': 'ALERT_RESOLVED_BULK',
+                'alert_count': updated,
+            })
 
         return Response({
             'message': f'{updated} alerts resolved',
