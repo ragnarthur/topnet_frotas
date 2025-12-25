@@ -13,7 +13,7 @@ router.register('fuel-transactions', FuelTransactionViewSet, basename='fuel-tran
 router.register('fuel-prices', FuelPriceSnapshotViewSet, basename='fuel-price')
 
 urlpatterns = [
-    path('', include(router.urls)),
     path('fuel-prices/latest/', LatestFuelPriceView.as_view(), name='latest-fuel-price'),
     path('dashboard/summary/', DashboardSummaryView.as_view(), name='dashboard-summary'),
+    path('', include(router.urls)),
 ]

@@ -29,7 +29,7 @@ INSTALLED_APPS = [
     'django_filters',
     # Local apps
     'apps.core',
-    'apps.fuel',
+    'apps.fuel.apps.FuelConfig',
     'apps.alerts',
     'apps.users',
 ]
