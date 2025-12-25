@@ -331,3 +331,24 @@ class DashboardSummaryView(APIView):
                 'top_alerts': top_alerts
             }
         })
+
+
+class FetchANPPricesView(APIView):
+    """Manually trigger ANP price fetch."""
+
+    def post(self, request):
+        from apps.fuel.services import fetch_and_save_anp_prices
+
+        result = fetch_and_save_anp_prices()
+
+        if result['success']:
+            return Response({
+                'message': 'ANP prices updated successfully',
+                'prices_updated': result['prices_updated'],
+                'source_url': result.get('source_url'),
+            }, status=status.HTTP_200_OK)
+        else:
+            return Response({
+                'message': 'Failed to fetch ANP prices',
+                'errors': result['errors'],
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

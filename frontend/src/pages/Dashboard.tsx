@@ -87,6 +87,17 @@ export function DashboardPage() {
     },
   })
 
+  const fetchANPMutation = useMutation({
+    mutationFn: () => fuelPrices.fetchANP(),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      toast.success(`Preços ANP atualizados! ${data.prices_updated.length} combustíveis.`)
+    },
+    onError: () => {
+      toast.error('Erro ao buscar preços da ANP')
+    },
+  })
+
   if (isLoading) {
     return <DashboardSkeleton />
   }
@@ -237,8 +248,16 @@ export function DashboardPage() {
           </div>
           <div className="flex items-center gap-2">
             <Badge variant="secondary">referência</Badge>
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => fetchANPMutation.mutate()}
+              disabled={fetchANPMutation.isPending}
+            >
+              {fetchANPMutation.isPending ? 'Buscando...' : 'Buscar ANP'}
+            </Button>
             <Button variant="outline" size="sm" onClick={openNationalDialog}>
-              Atualizar média
+              Manual
             </Button>
           </div>
         </div>

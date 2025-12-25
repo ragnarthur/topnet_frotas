@@ -240,6 +240,14 @@ export const fuelPrices = {
     })
     return response.data
   },
+  fetchANP: async (): Promise<{
+    message: string
+    prices_updated: Array<{ fuel_type: string; price: string; action: string }>
+    source_url?: string
+  }> => {
+    const response = await api.post('/fuel-prices/fetch-anp/')
+    return response.data
+  },
 }
 
 // Dashboard

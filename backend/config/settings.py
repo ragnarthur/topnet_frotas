@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
     'django_filters',
+    'django_celery_beat',
     # Local apps
     'apps.core',
     'apps.fuel.apps.FuelConfig',
@@ -152,6 +153,16 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
+
+# Celery Beat Schedule - Periodic Tasks
+CELERY_BEAT_SCHEDULE = {
+    'fetch-anp-prices-weekly': {
+        'task': 'apps.fuel.tasks.fetch_anp_prices_task',
+        'schedule': 604800.0,  # Every 7 days (in seconds)
+        # Alternative: use crontab for specific time
+        # 'schedule': crontab(hour=10, minute=0, day_of_week=1),  # Monday 10:00 AM
+    },
+}
 
 # Redis Pub/Sub channel for realtime events
 REDIS_PUBSUB_CHANNEL = 'topnet.frotas.events'
