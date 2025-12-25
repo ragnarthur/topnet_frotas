@@ -4,6 +4,7 @@ Management command to seed initial data for TopNet Frotas.
 from decimal import Decimal
 
 from django.core.management.base import BaseCommand
+from django.utils import timezone
 
 from apps.core.models import (
     CostCenter,
@@ -14,6 +15,7 @@ from apps.core.models import (
     UsageCategory,
     Vehicle,
 )
+from apps.fuel.models import FuelPriceSnapshot, FuelPriceSource
 
 
 class Command(BaseCommand):
@@ -122,9 +124,32 @@ class Command(BaseCommand):
             status = 'Created' if created else 'Updated'
             self.stdout.write(f'  {status} station: {station.name}')
 
+        # Create national average fuel price snapshots (manual reference)
+        avg_prices = [
+            (FuelType.GASOLINE, Decimal('5.49')),
+            (FuelType.ETHANOL, Decimal('3.89')),
+            (FuelType.DIESEL, Decimal('6.39')),
+        ]
+
+        for fuel_type, price in avg_prices:
+            snapshot, created = FuelPriceSnapshot.objects.update_or_create(
+                fuel_type=fuel_type,
+                station=None,
+                defaults={
+                    'price_per_liter': price,
+                    'collected_at': timezone.now(),
+                    'source': FuelPriceSource.MANUAL,
+                }
+            )
+            status = 'Created' if created else 'Updated'
+            self.stdout.write(
+                f'  {status} national avg price: {snapshot.get_fuel_type_display()} = R$ {snapshot.price_per_liter}'
+            )
+
         self.stdout.write(self.style.SUCCESS('\nSeed completed successfully!'))
         self.stdout.write(f'\nSummary:')
         self.stdout.write(f'  Vehicles: {Vehicle.objects.count()}')
         self.stdout.write(f'  Drivers: {Driver.objects.count()}')
         self.stdout.write(f'  Cost Centers: {CostCenter.objects.count()}')
         self.stdout.write(f'  Fuel Stations: {FuelStation.objects.count()}')
+        self.stdout.write(f'  Fuel Price Snapshots: {FuelPriceSnapshot.objects.count()}')

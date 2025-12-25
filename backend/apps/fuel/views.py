@@ -242,6 +242,16 @@ class DashboardSummaryView(APIView):
                     expected_cost += tx.liters * snapshot.price_per_liter
                     actual_cost += tx.total_cost
 
+        national_avg_prices = [
+            {
+                'fuel_type': snapshot.fuel_type,
+                'price_per_liter': snapshot.price_per_liter,
+                'collected_at': snapshot.collected_at,
+                'source': snapshot.source,
+            }
+            for snapshot in latest_by_type.values()
+        ]
+
         if coverage_liters > 0:
             national_avg_price = expected_cost / coverage_liters
             delta = expected_cost - actual_cost
@@ -280,6 +290,7 @@ class DashboardSummaryView(APIView):
             },
             'price_reference': {
                 'national_avg_price': national_avg_price,
+                'national_avg_prices': national_avg_prices,
                 'coverage_liters': coverage_liters,
                 'coverage_ratio': coverage_ratio,
                 'expected_cost': expected_cost if coverage_liters > 0 else None,

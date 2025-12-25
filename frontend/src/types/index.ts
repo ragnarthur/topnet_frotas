@@ -189,6 +189,12 @@ export interface DashboardSummary {
   }
   price_reference: {
     national_avg_price: number | null
+    national_avg_prices: Array<{
+      fuel_type: FuelType
+      price_per_liter: number
+      collected_at: string
+      source: string
+    }>
     coverage_liters: number
     coverage_ratio: number
     expected_cost: number | null

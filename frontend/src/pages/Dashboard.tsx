@@ -64,6 +64,14 @@ export function DashboardPage() {
   const deltaColor = deltaValue > 0 ? 'text-emerald-400' : deltaValue < 0 ? 'text-red-400' : 'text-muted-foreground'
   const deltaPercent = priceRef?.delta_percent ? Math.abs(priceRef.delta_percent) : 0
   const coveragePercent = priceRef?.coverage_ratio ? priceRef.coverage_ratio * 100 : 0
+  const nationalPrices = priceRef?.national_avg_prices ?? []
+  const hasImpact = priceRef?.coverage_liters && priceRef.coverage_liters > 0
+
+  const fuelTypeLabels: Record<string, string> = {
+    GASOLINE: 'Gasolina',
+    ETHANOL: 'Etanol',
+    DIESEL: 'Diesel',
+  }
 
   const monthlyData = data.monthly_trend.map(item => ({
     month: new Date(item.month).toLocaleDateString('pt-BR', { month: 'short' }),
@@ -147,26 +155,43 @@ export function DashboardPage() {
           </div>
           <Badge variant="secondary">referência</Badge>
         </div>
-        {hasNationalAvg ? (
+        {nationalPrices.length > 0 ? (
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Média nacional por litro</p>
-              <p className="text-2xl font-bold">
-                {formatCurrency(Number(priceRef.national_avg_price))}
-              </p>
+              {hasNationalAvg && (
+                <p className="text-2xl font-bold">
+                  {formatCurrency(Number(priceRef.national_avg_price))}
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {nationalPrices.map((price) => (
+                  <Badge key={price.fuel_type} variant="secondary">
+                    {fuelTypeLabels[price.fuel_type] || price.fuel_type}: {formatCurrency(price.price_per_liter)}
+                  </Badge>
+                ))}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Cobertura: {formatNumber(coveragePercent, 1)}% dos litros do período
               </p>
             </div>
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Impacto no período</p>
-              <p className={`text-2xl font-bold ${deltaColor}`}>
-                {deltaValue > 0 ? '+' : ''}
-                {formatCurrency(Math.abs(Number(deltaValue)))}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {deltaLabel} vs média ({formatNumber(deltaPercent, 1)}%)
-              </p>
+              {hasImpact ? (
+                <>
+                  <p className={`text-2xl font-bold ${deltaColor}`}>
+                    {deltaValue > 0 ? '+' : ''}
+                    {formatCurrency(Math.abs(Number(deltaValue)))}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {deltaLabel} vs média ({formatNumber(deltaPercent, 1)}%)
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Sem abastecimentos no período para calcular impacto.
+                </p>
+              )}
             </div>
           </div>
         ) : (
