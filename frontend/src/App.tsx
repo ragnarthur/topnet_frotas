@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
   RouterProvider,
@@ -9,10 +10,34 @@ import {
 } from '@tanstack/react-router'
 import { AuthProvider, useAuth } from '@/hooks/useAuth'
 import { Layout } from '@/components/Layout'
-import { LoginPage } from '@/pages/Login'
-import { DashboardPage } from '@/pages/Dashboard'
-import { TransactionsPage } from '@/pages/Transactions'
-import { VehiclesPage } from '@/pages/Vehicles'
+import { Toaster } from '@/components/ui/sonner'
+
+// Lazy load pages
+const LoginPage = lazy(() => import('@/pages/Login').then(m => ({ default: m.LoginPage })))
+const DashboardPage = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.DashboardPage })))
+const TransactionsPage = lazy(() => import('@/pages/Transactions').then(m => ({ default: m.TransactionsPage })))
+const VehiclesPage = lazy(() => import('@/pages/Vehicles').then(m => ({ default: m.VehiclesPage })))
+const DriversPage = lazy(() => import('@/pages/Drivers').then(m => ({ default: m.DriversPage })))
+const CostCentersPage = lazy(() => import('@/pages/CostCenters').then(m => ({ default: m.CostCentersPage })))
+const StationsPage = lazy(() => import('@/pages/Stations').then(m => ({ default: m.StationsPage })))
+const AlertsPage = lazy(() => import('@/pages/Alerts').then(m => ({ default: m.AlertsPage })))
+
+// Loading component
+function PageLoader() {
+  return (
+    <div className="flex h-[50vh] items-center justify-center">
+      <div className="flex flex-col items-center gap-4">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-500 border-t-transparent" />
+        <p className="text-sm text-muted-foreground">Carregando...</p>
+      </div>
+    </div>
+  )
+}
+
+// Wrapper for lazy components
+function LazyPage({ children }: { children: React.ReactNode }) {
+  return <Suspense fallback={<PageLoader />}>{children}</Suspense>
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,7 +57,7 @@ const rootRoute = createRootRoute({
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: '/login',
-  component: LoginPage,
+  component: () => <LazyPage><LoginPage /></LazyPage>,
 })
 
 // Protected layout
@@ -58,53 +83,43 @@ const protectedRoute = createRoute({
 const dashboardRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/',
-  component: DashboardPage,
+  component: () => <LazyPage><DashboardPage /></LazyPage>,
 })
 
 const transactionsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/abastecimentos',
-  component: TransactionsPage,
+  component: () => <LazyPage><TransactionsPage /></LazyPage>,
 })
 
 const vehiclesRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/veiculos',
-  component: VehiclesPage,
+  component: () => <LazyPage><VehiclesPage /></LazyPage>,
 })
-
-// Placeholder pages for other routes
-function PlaceholderPage({ title }: { title: string }) {
-  return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold">{title}</h1>
-      <p className="text-muted-foreground">Em desenvolvimento...</p>
-    </div>
-  )
-}
 
 const driversRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/motoristas',
-  component: () => <PlaceholderPage title="Motoristas" />,
+  component: () => <LazyPage><DriversPage /></LazyPage>,
 })
 
 const costCentersRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/centros-custo',
-  component: () => <PlaceholderPage title="Centros de Custo" />,
+  component: () => <LazyPage><CostCentersPage /></LazyPage>,
 })
 
 const stationsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/postos',
-  component: () => <PlaceholderPage title="Postos" />,
+  component: () => <LazyPage><StationsPage /></LazyPage>,
 })
 
 const alertsRoute = createRoute({
   getParentRoute: () => protectedRoute,
   path: '/alertas',
-  component: () => <PlaceholderPage title="Alertas" />,
+  component: () => <LazyPage><AlertsPage /></LazyPage>,
 })
 
 // Create route tree
@@ -136,6 +151,7 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <RouterProvider router={router} />
+        <Toaster richColors position="top-right" />
       </AuthProvider>
     </QueryClientProvider>
   )

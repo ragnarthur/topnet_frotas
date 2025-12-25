@@ -49,6 +49,8 @@ export interface Driver extends BaseModel {
 export interface DriverList {
   id: string
   name: string
+  doc_id: string
+  phone: string
   active: boolean
 }
 
@@ -80,6 +82,7 @@ export interface FuelStationList {
   id: string
   name: string
   city: string
+  address: string
   active: boolean
 }
 
