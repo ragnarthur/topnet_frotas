@@ -233,6 +233,13 @@ export const fuelPrices = {
     const response = await api.get('/fuel-prices/latest/', { params })
     return response.data
   },
+  updateNational: async (fuelType: FuelType, price_per_liter: number): Promise<FuelPriceLatest> => {
+    const response = await api.post('/fuel-prices/national/', {
+      fuel_type: fuelType,
+      price_per_liter,
+    })
+    return response.data
+  },
 }
 
 // Dashboard

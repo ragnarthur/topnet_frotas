@@ -3,7 +3,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence, motion } from 'framer-motion'
 import { CalendarClock, Plus } from 'lucide-react'
 import { fuelTransactions, vehicles, drivers, fuelStations, costCenters, fuelPrices } from '@/api/client'
-import { formatCurrency, formatDateTime, formatNumber } from '@/lib/utils'
+import {
+  formatCurrency,
+  formatDateTime,
+  formatNumber,
+  formatCurrencyInput,
+  maskCurrencyInput,
+  parseDecimalInput,
+} from '@/lib/utils'
 import type { FuelType } from '@/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -81,69 +88,8 @@ function maskDecimalInput(value: string, maxDecimals: number) {
   return fractionPart ? `${integerPart},${fractionPart}` : integerPart
 }
 
-function maskCurrencyInput(value: string, maxDecimals: number) {
-  const cleaned = value.replace(/[^\d.,]/g, '')
-  if (!cleaned) {
-    return ''
-  }
-
-  const commaIndex = cleaned.indexOf(',')
-  const dotIndex = cleaned.indexOf('.')
-  const separatorIndex = commaIndex >= 0 ? commaIndex : dotIndex
-  const hasTrailingSeparator = separatorIndex === cleaned.length - 1
-
-  let integerPart = cleaned
-  let fractionPart = ''
-  if (separatorIndex >= 0) {
-    integerPart = cleaned.slice(0, separatorIndex)
-    fractionPart = cleaned.slice(separatorIndex + 1).replace(/[.,]/g, '')
-  }
-
-  integerPart = integerPart.replace(/^0+(?=\d)/, '')
-  if (integerPart === '' && fractionPart) {
-    integerPart = '0'
-  }
-
-  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-  fractionPart = fractionPart.slice(0, maxDecimals)
-
-  if (hasTrailingSeparator) {
-    return `R$ ${formattedInteger || '0'},`
-  }
-  return fractionPart
-    ? `R$ ${formattedInteger},${fractionPart}`
-    : `R$ ${formattedInteger}`
-}
-
 function maskIntegerInput(value: string) {
   return value.replace(/\D/g, '')
-}
-
-function parseDecimalInput(value: string) {
-  const cleaned = value.replace(/[^\d.,]/g, '')
-  const normalized = cleaned.replace(/\./g, '').replace(',', '.')
-  const parsed = Number(normalized)
-  return Number.isNaN(parsed) ? 0 : parsed
-}
-
-function formatDecimalForInput(value: number | string, decimals: number) {
-  const parsed = Number(String(value).replace(',', '.'))
-  if (!Number.isFinite(parsed)) {
-    return ''
-  }
-  return parsed.toFixed(decimals).replace('.', ',')
-}
-
-function formatCurrencyForInput(value: number | string, decimals: number) {
-  const formatted = formatDecimalForInput(value, decimals)
-  if (!formatted) {
-    return ''
-  }
-  const [integerPart, fractionPart] = formatted.split(',')
-  const withThousands = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, '.')
-  return fractionPart
-    ? `R$ ${withThousands},${fractionPart}`
-    : `R$ ${withThousands}`
 }
 
 export function TransactionsPage() {
@@ -220,7 +166,7 @@ export function TransactionsPage() {
         if (price) {
           setForm((prev) => ({
             ...prev,
-            unit_price: formatCurrencyForInput(price.price_per_liter, 4)
+            unit_price: formatCurrencyInput(price.price_per_liter, 4)
           }))
         }
       } catch {

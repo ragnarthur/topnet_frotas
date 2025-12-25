@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useState } from 'react'
 import { motion } from 'framer-motion'
 import {
   AreaChart,
@@ -20,9 +21,27 @@ import {
   Fuel,
   ArrowUpRight,
 } from 'lucide-react'
-import { dashboard } from '@/api/client'
-import { formatCurrency, formatNumber } from '@/lib/utils'
+import { dashboard, fuelPrices } from '@/api/client'
+import { toast } from 'sonner'
+import {
+  formatCurrency,
+  formatCurrencyInput,
+  formatNumber,
+  maskCurrencyInput,
+  parseDecimalInput,
+} from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -40,9 +59,16 @@ const itemVariants = {
 const COLORS = ['#8b5cf6', '#06b6d4', '#10b981', '#f59e0b', '#ef4444']
 
 export function DashboardPage() {
+  const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => dashboard.summary(),
+  })
+  const [isNationalDialogOpen, setIsNationalDialogOpen] = useState(false)
+  const [nationalForm, setNationalForm] = useState({
+    GASOLINE: '',
+    ETHANOL: '',
+    DIESEL: '',
   })
 
   if (isLoading) {
@@ -71,6 +97,62 @@ export function DashboardPage() {
     GASOLINE: 'Gasolina',
     ETHANOL: 'Etanol',
     DIESEL: 'Diesel',
+  }
+
+  const updateNationalMutation = useMutation({
+    mutationFn: async (entries: Array<{ fuelType: 'GASOLINE' | 'ETHANOL' | 'DIESEL'; price: number }>) => {
+      return Promise.all(
+        entries.map((entry) => fuelPrices.updateNational(entry.fuelType, entry.price))
+      )
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      toast.success('Média nacional atualizada!')
+      setIsNationalDialogOpen(false)
+    },
+    onError: () => {
+      toast.error('Erro ao atualizar a média nacional')
+    },
+  })
+
+  const openNationalDialog = () => {
+    const getValue = (fuelType: 'GASOLINE' | 'ETHANOL' | 'DIESEL') => {
+      const price = nationalPrices.find((item) => item.fuel_type === fuelType)
+      if (!price?.price_per_liter) return ''
+      return formatCurrencyInput(price.price_per_liter, 4)
+    }
+    setNationalForm({
+      GASOLINE: getValue('GASOLINE'),
+      ETHANOL: getValue('ETHANOL'),
+      DIESEL: getValue('DIESEL'),
+    })
+    setIsNationalDialogOpen(true)
+  }
+
+  const handleSaveNationalPrices = () => {
+    const entries = (['GASOLINE', 'ETHANOL', 'DIESEL'] as const)
+      .map((fuelType) => ({
+        fuelType,
+        value: nationalForm[fuelType].trim(),
+        price: parseDecimalInput(nationalForm[fuelType]),
+      }))
+      .filter((entry) => entry.value.length > 0)
+
+    if (entries.length === 0) {
+      toast.error('Informe ao menos um valor')
+      return
+    }
+
+    const invalid = entries.find((entry) => entry.price <= 0)
+    if (invalid) {
+      toast.error('Informe valores maiores que zero')
+      return
+    }
+
+    updateNationalMutation.mutate(entries.map((entry) => ({
+      fuelType: entry.fuelType,
+      price: entry.price,
+    })))
   }
 
   const monthlyData = data.monthly_trend.map(item => ({
@@ -153,7 +235,12 @@ export function DashboardPage() {
             <h3 className="text-lg font-semibold">Preço Médio Nacional</h3>
             <p className="text-sm text-muted-foreground">Referência para avaliação de ganhos/perdas</p>
           </div>
-          <Badge variant="secondary">referência</Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary">referência</Badge>
+            <Button variant="outline" size="sm" onClick={openNationalDialog}>
+              Atualizar média
+            </Button>
+          </div>
         </div>
         <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
           <div className="space-y-3">
@@ -206,6 +293,44 @@ export function DashboardPage() {
           </div>
         </div>
       </motion.div>
+
+      <Dialog open={isNationalDialogOpen} onOpenChange={setIsNationalDialogOpen}>
+        <DialogContent className="glass-card border-white/10 sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle>Atualizar média nacional</DialogTitle>
+            <DialogDescription>
+              Informe o valor médio por litro para cada combustível.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-2">
+            {(['GASOLINE', 'ETHANOL', 'DIESEL'] as const).map((fuelType) => (
+              <div key={fuelType} className="space-y-2">
+                <Label>{fuelTypeLabels[fuelType]}</Label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={nationalForm[fuelType]}
+                  onChange={(e) =>
+                    setNationalForm((prev) => ({
+                      ...prev,
+                      [fuelType]: maskCurrencyInput(e.target.value, 4),
+                    }))
+                  }
+                  placeholder="R$ 0,0000"
+                />
+              </div>
+            ))}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsNationalDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveNationalPrices} disabled={updateNationalMutation.isPending}>
+              {updateNationalMutation.isPending ? 'Salvando...' : 'Salvar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Charts Row */}
       <div className="grid gap-6 lg:grid-cols-2">

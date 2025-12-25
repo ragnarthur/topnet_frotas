@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from apps.core.serializers import (
@@ -6,6 +8,8 @@ from apps.core.serializers import (
     FuelStationListSerializer,
     VehicleListSerializer,
 )
+
+from apps.core.models import FuelType
 
 from .models import FuelPriceSnapshot, FuelTransaction
 
@@ -140,3 +144,13 @@ class LatestPriceSerializer(serializers.Serializer):
     source = serializers.CharField()
     station_id = serializers.UUIDField(allow_null=True)
     station_name = serializers.CharField(allow_null=True)
+
+
+class NationalFuelPriceUpsertSerializer(serializers.Serializer):
+    fuel_type = serializers.ChoiceField(choices=FuelType.choices)
+    price_per_liter = serializers.DecimalField(
+        max_digits=8,
+        decimal_places=4,
+        min_value=Decimal('0.0001')
+    )
+    collected_at = serializers.DateTimeField(required=False)

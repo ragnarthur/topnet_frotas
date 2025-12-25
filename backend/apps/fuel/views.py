@@ -20,6 +20,7 @@ from .serializers import (
     FuelTransactionListSerializer,
     FuelTransactionSerializer,
     LatestPriceSerializer,
+    NationalFuelPriceUpsertSerializer,
 )
 
 
@@ -121,6 +122,30 @@ class LatestFuelPriceView(APIView):
             'station_name': snapshot.station.name if snapshot.station else None,
         }
         return Response(data)
+
+
+class NationalFuelPriceView(APIView):
+    """Create/update national average fuel price (manual reference)."""
+
+    def post(self, request):
+        serializer = NationalFuelPriceUpsertSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        fuel_type = serializer.validated_data['fuel_type']
+        price_per_liter = serializer.validated_data['price_per_liter']
+        collected_at = serializer.validated_data.get('collected_at') or timezone.now()
+
+        snapshot, _ = FuelPriceSnapshot.objects.update_or_create(
+            fuel_type=fuel_type,
+            station=None,
+            defaults={
+                'price_per_liter': price_per_liter,
+                'collected_at': collected_at,
+                'source': FuelPriceSource.MANUAL,
+            }
+        )
+
+        return Response(FuelPriceSnapshotSerializer(snapshot).data, status=status.HTTP_200_OK)
 
 
 class DashboardSummaryView(APIView):
