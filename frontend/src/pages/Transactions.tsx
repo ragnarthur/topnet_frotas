@@ -430,6 +430,9 @@ export function TransactionsPage() {
                       placeholder="R$ 0,0000"
                       required
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Baseado na média nacional. Ajuste se o preço do posto for diferente.
+                    </p>
                   </div>
 
                   <div className="space-y-2">

@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 from apps.alerts.models import Alert
 from apps.core.models import UsageCategory, Vehicle
 
-from .models import FuelPriceSnapshot, FuelTransaction
+from .models import FuelPriceSnapshot, FuelPriceSource, FuelTransaction
 from .serializers import (
     FuelPriceSnapshotSerializer,
     FuelTransactionCreateSerializer,
@@ -82,12 +82,12 @@ class LatestFuelPriceView(APIView):
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        # Get latest snapshot
-        queryset = FuelPriceSnapshot.objects.filter(fuel_type=fuel_type)
-
-        # Try specific station first
+        # Try specific station first (pump price reference)
         if station_id:
-            snapshot = queryset.filter(station_id=station_id).first()
+            snapshot = FuelPriceSnapshot.objects.filter(
+                fuel_type=fuel_type,
+                station_id=station_id
+            ).first()
             if snapshot:
                 data = {
                     'fuel_type': snapshot.fuel_type,
@@ -99,14 +99,16 @@ class LatestFuelPriceView(APIView):
                 }
                 return Response(data)
 
-        # Fallback to global or any
-        snapshot = queryset.filter(station__isnull=True).first()
-        if not snapshot:
-            snapshot = queryset.first()
+        # Prefer national average (external/manual) for global price
+        snapshot = FuelPriceSnapshot.objects.filter(
+            fuel_type=fuel_type,
+            station__isnull=True,
+            source__in=[FuelPriceSource.EXTERNAL_ANP, FuelPriceSource.MANUAL]
+        ).first()
 
         if not snapshot:
             return Response(
-                {'error': 'No price found for this fuel type'},
+                {'error': 'No national average price found for this fuel type'},
                 status=status.HTTP_404_NOT_FOUND
             )
 

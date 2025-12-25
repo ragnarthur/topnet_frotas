@@ -27,18 +27,7 @@ def update_fuel_price_snapshot(sender, instance, created, **kwargs):
     This keeps the "current price" always up-to-date based on real data.
     """
     try:
-        # Update global snapshot (no station)
-        FuelPriceSnapshot.objects.update_or_create(
-            fuel_type=instance.fuel_type,
-            station=None,
-            defaults={
-                'price_per_liter': instance.unit_price,
-                'collected_at': instance.purchased_at,
-                'source': FuelPriceSource.LAST_TRANSACTION,
-            }
-        )
-
-        # Also update station-specific snapshot if station is set
+        # Update station-specific snapshot if station is set (pump price reference)
         if instance.station_id:
             FuelPriceSnapshot.objects.update_or_create(
                 fuel_type=instance.fuel_type,

@@ -171,7 +171,7 @@ class FuelPriceSnapshot(BaseModel):
     @classmethod
     def get_latest_price(cls, fuel_type, station=None):
         """Get the most recent price for a fuel type, optionally at a specific station."""
-        # First try to get price for specific station
+        # First try station-specific price (if provided)
         if station:
             snapshot = cls.objects.filter(
                 fuel_type=fuel_type,
@@ -180,14 +180,13 @@ class FuelPriceSnapshot(BaseModel):
             if snapshot:
                 return snapshot.price_per_liter
 
-        # Fallback to global (no station)
+        # Prefer national average (external/manual) for global price
         snapshot = cls.objects.filter(
             fuel_type=fuel_type,
-            station__isnull=True
+            station__isnull=True,
+            source__in=[FuelPriceSource.EXTERNAL_ANP, FuelPriceSource.MANUAL],
         ).first()
         if snapshot:
             return snapshot.price_per_liter
 
-        # Last resort: any price for this fuel type
-        snapshot = cls.objects.filter(fuel_type=fuel_type).first()
-        return snapshot.price_per_liter if snapshot else None
+        return None
