@@ -1,6 +1,7 @@
 import uuid
 
 from django.db import models
+from django.db.models import Q
 
 from apps.core.models import (
     BaseModel,
@@ -149,6 +150,18 @@ class FuelPriceSnapshot(BaseModel):
         indexes = [
             models.Index(fields=['fuel_type', '-collected_at']),
             models.Index(fields=['fuel_type', 'station', '-collected_at']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['fuel_type'],
+                condition=Q(station__isnull=True),
+                name='uniq_fuel_price_global',
+            ),
+            models.UniqueConstraint(
+                fields=['fuel_type', 'station'],
+                condition=Q(station__isnull=False),
+                name='uniq_fuel_price_station',
+            ),
         ]
 
     def __str__(self):
