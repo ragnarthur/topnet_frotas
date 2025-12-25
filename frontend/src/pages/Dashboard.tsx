@@ -26,7 +26,6 @@ import { toast } from 'sonner'
 import {
   formatCurrency,
   formatCurrencyInput,
-  formatDate,
   formatNumber,
   maskCurrencyInput,
   parseDecimalInput,
@@ -179,6 +178,20 @@ export function DashboardPage() {
     litros: Number(v.total_liters),
   }))
 
+  const getGreeting = () => {
+    const hour = new Date().getHours()
+    if (hour < 12) return 'Bom dia!'
+    if (hour < 18) return 'Boa tarde!'
+    return 'Boa noite!'
+  }
+
+  const getCurrentMonthYear = () => {
+    return new Date().toLocaleDateString('pt-BR', {
+      month: 'long',
+      year: 'numeric',
+    }).replace(/^\w/, (c) => c.toUpperCase())
+  }
+
   return (
     <motion.div
       variants={containerVariants}
@@ -189,10 +202,10 @@ export function DashboardPage() {
       {/* Header */}
       <motion.div variants={itemVariants} className="flex flex-col gap-2">
         <h1 className="text-3xl font-bold">
-          <span className="gradient-text">Dashboard</span>
+          <span className="gradient-text">{getGreeting()}</span>
         </h1>
         <p className="text-muted-foreground">
-          Período: {formatDate(data.period.from)} a {formatDate(data.period.to)}
+          Resumo de {getCurrentMonthYear()}
         </p>
       </motion.div>
 
