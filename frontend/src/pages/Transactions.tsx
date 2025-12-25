@@ -99,6 +99,8 @@ export function TransactionsPage() {
   const { isAdmin, isDriver, user } = useAuth()
   const driverVehicle = user?.driver?.current_vehicle || null
   const [showForm, setShowForm] = useState(false)
+  const [attachmentFile, setAttachmentFile] = useState<File | null>(null)
+  const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null)
   const buildEmptyForm = (vehicleId = '', fuelType: FuelType = 'GASOLINE') => ({
     vehicle: vehicleId,
     driver: '',
@@ -154,6 +156,8 @@ export function TransactionsPage() {
         isDriver && driverVehicle ? driverVehicle.id : '',
         isDriver && driverVehicle ? driverVehicle.fuel_type : 'GASOLINE'
       ))
+      setAttachmentFile(null)
+      setAttachmentPreview(null)
     },
   })
 
@@ -181,6 +185,14 @@ export function TransactionsPage() {
     }
     void loadPrice()
   }, [isDriver, driverVehicle])
+
+  useEffect(() => {
+    return () => {
+      if (attachmentPreview) {
+        URL.revokeObjectURL(attachmentPreview)
+      }
+    }
+  }, [attachmentPreview])
 
   const handleVehicleChange = async (vehicleId: string) => {
     setForm((prev) => ({ ...prev, vehicle: vehicleId }))
@@ -219,7 +231,33 @@ export function TransactionsPage() {
       odometer_km: Number(maskIntegerInput(form.odometer_km)),
       fuel_type: form.fuel_type,
       notes: form.notes || undefined,
+      attachment: attachmentFile || undefined,
     })
+  }
+
+  const handleAttachmentChange = (file: File | null) => {
+    if (!file) {
+      setAttachmentFile(null)
+      setAttachmentPreview(null)
+      return
+    }
+
+    const maxSizeMb = 5
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Envie apenas imagens (JPG, PNG, WEBP).')
+      return
+    }
+
+    if (file.size > maxSizeMb * 1024 * 1024) {
+      toast.error(`Arquivo muito grande. Limite de ${maxSizeMb}MB.`)
+      return
+    }
+
+    const previewUrl = URL.createObjectURL(file)
+    setAttachmentFile(file)
+    setAttachmentPreview(previewUrl)
   }
 
   return (
@@ -463,6 +501,42 @@ export function TransactionsPage() {
                       onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))}
                       placeholder="Observações adicionais..."
                     />
+                  </div>
+
+                  <div className="space-y-2 md:col-span-2 lg:col-span-3">
+                    <Label>Comprovante</Label>
+                    <Input
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={(e) => handleAttachmentChange(e.target.files?.[0] || null)}
+                    />
+                    {attachmentPreview && (
+                      <div className="flex items-center gap-4 rounded-xl border border-white/10 bg-white/5 p-4">
+                        <img
+                          src={attachmentPreview}
+                          alt="Pré-visualização do comprovante"
+                          className="h-20 w-20 rounded-lg object-cover"
+                        />
+                        <div className="flex-1">
+                          <p className="text-sm font-medium">{attachmentFile?.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {(attachmentFile?.size || 0) / 1024 / 1024 < 1
+                              ? `${Math.round((attachmentFile?.size || 0) / 1024)} KB`
+                              : `${((attachmentFile?.size || 0) / 1024 / 1024).toFixed(2)} MB`}
+                          </p>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => handleAttachmentChange(null)}
+                        >
+                          Remover
+                        </Button>
+                      </div>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      Formatos aceitos: JPG, PNG, WEBP (até 5MB).
+                    </p>
                   </div>
 
                   <div className="flex gap-2 md:col-span-2 lg:col-span-3">

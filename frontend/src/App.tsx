@@ -16,6 +16,8 @@ import { Toaster } from '@/components/ui/sonner'
 const LoginPage = lazy(() => import('@/pages/Login').then(m => ({ default: m.LoginPage })))
 const DashboardPage = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.DashboardPage })))
 const DriverDashboardPage = lazy(() => import('@/pages/DriverDashboard').then(m => ({ default: m.DriverDashboardPage })))
+const EventsPage = lazy(() => import('@/pages/Events').then(m => ({ default: m.EventsPage })))
+const ReportsPage = lazy(() => import('@/pages/Reports').then(m => ({ default: m.ReportsPage })))
 const TransactionsPage = lazy(() => import('@/pages/Transactions').then(m => ({ default: m.TransactionsPage })))
 const VehiclesPage = lazy(() => import('@/pages/Vehicles').then(m => ({ default: m.VehiclesPage })))
 const DriversPage = lazy(() => import('@/pages/Drivers').then(m => ({ default: m.DriversPage })))
@@ -162,6 +164,18 @@ const alertsRoute = createRoute({
   component: () => <AdminRoute><LazyPage><AlertsPage /></LazyPage></AdminRoute>,
 })
 
+const eventsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/eventos',
+  component: () => <AdminRoute><LazyPage><EventsPage /></LazyPage></AdminRoute>,
+})
+
+const reportsRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/relatorios',
+  component: () => <AdminRoute><LazyPage><ReportsPage /></LazyPage></AdminRoute>,
+})
+
 // Create route tree
 const routeTree = rootRoute.addChildren([
   loginRoute,
@@ -173,6 +187,8 @@ const routeTree = rootRoute.addChildren([
     costCentersRoute,
     stationsRoute,
     alertsRoute,
+    eventsRoute,
+    reportsRoute,
   ]),
 ])
 

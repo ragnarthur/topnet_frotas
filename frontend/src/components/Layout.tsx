@@ -14,6 +14,8 @@ import {
   ChevronRight,
   User,
   Globe,
+  Activity,
+  FileText,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -33,6 +35,8 @@ interface NavItem {
 const allNavigation: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Abastecimentos', href: '/abastecimentos', icon: Fuel },
+  { name: 'Eventos', href: '/eventos', icon: Activity, adminOnly: true },
+  { name: 'Relatórios', href: '/relatorios', icon: FileText, adminOnly: true },
   { name: 'Veículos', href: '/veiculos', icon: Car, adminOnly: true },
   { name: 'Motoristas', href: '/motoristas', icon: Users, adminOnly: true },
   { name: 'Centros de Custo', href: '/centros-custo', icon: Building2, adminOnly: true },

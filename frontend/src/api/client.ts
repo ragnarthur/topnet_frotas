@@ -333,6 +333,36 @@ export const dashboard = {
   },
 }
 
+// Reports
+export const reports = {
+  exportTransactions: async (params?: {
+    from?: string
+    to?: string
+    include_personal?: boolean
+  }): Promise<{ blob: Blob; filename: string }> => {
+    const queryParams: Record<string, string> = {}
+    if (params?.from) queryParams.from = params.from
+    if (params?.to) queryParams.to = params.to
+    if (params?.include_personal) queryParams.include_personal = '1'
+
+    const response = await api.get('/reports/transactions/export/', {
+      params: queryParams,
+      responseType: 'blob',
+    })
+
+    const disposition = response.headers['content-disposition'] as string | undefined
+    let filename = 'abastecimentos.csv'
+    if (disposition) {
+      const match = disposition.match(/filename="([^"]+)"/)
+      if (match?.[1]) {
+        filename = match[1]
+      }
+    }
+
+    return { blob: response.data, filename }
+  },
+}
+
 // Alerts
 export const alerts = {
   list: async (params?: {

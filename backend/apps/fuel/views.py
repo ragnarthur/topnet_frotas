@@ -1,3 +1,4 @@
+import csv
 from datetime import timedelta
 from decimal import Decimal
 
@@ -6,6 +7,7 @@ from django.db.models.functions import TruncMonth
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django_filters import rest_framework as filters
+from django.http import HttpResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -428,6 +430,87 @@ class FetchANPPricesView(APIView):
                 'message': 'Failed to fetch ANP prices',
                 'errors': result['errors'],
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class FuelTransactionsExportView(APIView):
+    """Export fuel transactions to CSV."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        from_date = request.query_params.get('from')
+        to_date = request.query_params.get('to')
+        include_personal = request.query_params.get('include_personal', '0') == '1'
+
+        if not from_date:
+            today = timezone.now().date()
+            from_date = today.replace(day=1)
+        else:
+            parsed_from = parse_date(from_date)
+            if not parsed_from:
+                return Response(
+                    {'error': "Invalid 'from' date. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            from_date = parsed_from
+
+        if not to_date:
+            to_date = timezone.now().date()
+        else:
+            parsed_to = parse_date(to_date)
+            if not parsed_to:
+                return Response(
+                    {'error': "Invalid 'to' date. Use YYYY-MM-DD."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            to_date = parsed_to
+
+        if from_date > to_date:
+            return Response(
+                {'error': "'from' date must be earlier than or equal to 'to' date."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        transactions = FuelTransaction.objects.select_related(
+            'vehicle', 'driver', 'station', 'cost_center'
+        ).filter(
+            purchased_at__date__gte=from_date,
+            purchased_at__date__lte=to_date
+        )
+
+        if not include_personal:
+            transactions = transactions.exclude(
+                vehicle__usage_category=UsageCategory.PERSONAL
+            )
+
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = (
+            f'attachment; filename="abastecimentos_{from_date}_{to_date}.csv"'
+        )
+
+        writer = csv.writer(response)
+        writer.writerow([
+            'Data/Hora', 'Veiculo', 'Placa', 'Motorista', 'Posto',
+            'Centro de Custo', 'Litros', 'Preco/L', 'Total', 'Odometro (km)',
+            'Combustivel', 'Observacoes'
+        ])
+
+        for tx in transactions.order_by('-purchased_at'):
+            writer.writerow([
+                tx.purchased_at.isoformat(sep=' ', timespec='minutes'),
+                tx.vehicle.name,
+                tx.vehicle.plate,
+                tx.driver.name if tx.driver else '',
+                tx.station.name if tx.station else '',
+                tx.cost_center.name if tx.cost_center else '',
+                f'{tx.liters}',
+                f'{tx.unit_price}',
+                f'{tx.total_cost}',
+                tx.odometer_km,
+                tx.fuel_type,
+                tx.notes or '',
+            ])
+
+        return response
 
 
 class DriverDashboardView(APIView):
