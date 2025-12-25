@@ -71,6 +71,22 @@ export function DashboardPage() {
     DIESEL: '',
   })
 
+  const updateNationalMutation = useMutation({
+    mutationFn: async (entries: Array<{ fuelType: 'GASOLINE' | 'ETHANOL' | 'DIESEL'; price: number }>) => {
+      return Promise.all(
+        entries.map((entry) => fuelPrices.updateNational(entry.fuelType, entry.price))
+      )
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
+      toast.success('Média nacional atualizada!')
+      setIsNationalDialogOpen(false)
+    },
+    onError: () => {
+      toast.error('Erro ao atualizar a média nacional')
+    },
+  })
+
   if (isLoading) {
     return <DashboardSkeleton />
   }
@@ -98,22 +114,6 @@ export function DashboardPage() {
     ETHANOL: 'Etanol',
     DIESEL: 'Diesel',
   }
-
-  const updateNationalMutation = useMutation({
-    mutationFn: async (entries: Array<{ fuelType: 'GASOLINE' | 'ETHANOL' | 'DIESEL'; price: number }>) => {
-      return Promise.all(
-        entries.map((entry) => fuelPrices.updateNational(entry.fuelType, entry.price))
-      )
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      toast.success('Média nacional atualizada!')
-      setIsNationalDialogOpen(false)
-    },
-    onError: () => {
-      toast.error('Erro ao atualizar a média nacional')
-    },
-  })
 
   const openNationalDialog = () => {
     const getValue = (fuelType: 'GASOLINE' | 'ETHANOL' | 'DIESEL') => {
