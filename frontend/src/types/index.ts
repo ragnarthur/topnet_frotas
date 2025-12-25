@@ -191,9 +191,9 @@ export interface DashboardSummary {
     national_avg_price: number | null
     national_avg_prices: Array<{
       fuel_type: FuelType
-      price_per_liter: number
-      collected_at: string
-      source: string
+      price_per_liter: number | null
+      collected_at: string | null
+      source: string | null
     }>
     coverage_liters: number
     coverage_ratio: number

@@ -155,50 +155,56 @@ export function DashboardPage() {
           </div>
           <Badge variant="secondary">referência</Badge>
         </div>
-        {nationalPrices.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Média nacional por litro</p>
-              {hasNationalAvg && (
-                <p className="text-2xl font-bold">
-                  {formatCurrency(Number(priceRef.national_avg_price))}
-                </p>
-              )}
-              <div className="flex flex-wrap gap-2">
-                {nationalPrices.map((price) => (
-                  <Badge key={price.fuel_type} variant="secondary">
-                    {fuelTypeLabels[price.fuel_type] || price.fuel_type}: {formatCurrency(price.price_per_liter)}
-                  </Badge>
-                ))}
-              </div>
+        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">Média nacional por litro</p>
+            <div className="grid gap-3 sm:grid-cols-3">
+              {['GASOLINE', 'ETHANOL', 'DIESEL'].map((fuelType) => {
+                const price = nationalPrices.find((item) => item.fuel_type === fuelType)
+                return (
+                  <div key={fuelType} className="rounded-xl border border-white/10 bg-white/5 p-4">
+                    <p className="text-xs text-muted-foreground">{fuelTypeLabels[fuelType]}</p>
+                    <p className="text-lg font-semibold">
+                      {price?.price_per_liter !== null && price?.price_per_liter !== undefined
+                        ? formatCurrency(Number(price.price_per_liter))
+                        : '—'}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {price?.collected_at ? 'Atualizado' : 'Sem média'}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+            {hasNationalAvg ? (
               <p className="text-xs text-muted-foreground">
                 Cobertura: {formatNumber(coveragePercent, 1)}% dos litros do período
               </p>
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Impacto no período</p>
-              {hasImpact ? (
-                <>
-                  <p className={`text-2xl font-bold ${deltaColor}`}>
-                    {deltaValue > 0 ? '+' : ''}
-                    {formatCurrency(Math.abs(Number(deltaValue)))}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {deltaLabel} vs média ({formatNumber(deltaPercent, 1)}%)
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Sem abastecimentos no período para calcular impacto.
-                </p>
-              )}
-            </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Cadastre um snapshot global (manual ou ANP) para exibir a média.
+              </p>
+            )}
           </div>
-        ) : (
-          <p className="text-sm text-muted-foreground">
-            Média nacional indisponível. Cadastre um snapshot global (manual ou ANP).
-          </p>
-        )}
+          <div className="space-y-2">
+            <p className="text-sm text-muted-foreground">Impacto no período</p>
+            {hasImpact ? (
+              <>
+                <p className={`text-2xl font-bold ${deltaColor}`}>
+                  {deltaValue > 0 ? '+' : ''}
+                  {formatCurrency(Math.abs(Number(deltaValue)))}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {deltaLabel} vs média ({formatNumber(deltaPercent, 1)}%)
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Sem abastecimentos no período para calcular impacto.
+              </p>
+            )}
+          </div>
+        </div>
       </motion.div>
 
       {/* Charts Row */}

@@ -11,7 +11,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.alerts.models import Alert
-from apps.core.models import UsageCategory, Vehicle
+from apps.core.models import FuelType, UsageCategory, Vehicle
 
 from .models import FuelPriceSnapshot, FuelPriceSource, FuelTransaction
 from .serializers import (
@@ -218,9 +218,10 @@ class DashboardSummaryView(APIView):
         )
 
         # National average reference (manual/external) vs actual cost
+        all_fuel_types = [choice[0] for choice in FuelType.choices]
         fuel_types = list(transactions.values_list('fuel_type', flat=True).distinct())
         snapshots = FuelPriceSnapshot.objects.filter(
-            fuel_type__in=fuel_types,
+            fuel_type__in=all_fuel_types,
             station__isnull=True,
             source__in=[FuelPriceSource.EXTERNAL_ANP, FuelPriceSource.MANUAL],
         ).order_by('fuel_type', '-collected_at')
@@ -242,15 +243,15 @@ class DashboardSummaryView(APIView):
                     expected_cost += tx.liters * snapshot.price_per_liter
                     actual_cost += tx.total_cost
 
-        national_avg_prices = [
-            {
-                'fuel_type': snapshot.fuel_type,
-                'price_per_liter': snapshot.price_per_liter,
-                'collected_at': snapshot.collected_at,
-                'source': snapshot.source,
-            }
-            for snapshot in latest_by_type.values()
-        ]
+        national_avg_prices = []
+        for fuel_type in all_fuel_types:
+            snapshot = latest_by_type.get(fuel_type)
+            national_avg_prices.append({
+                'fuel_type': fuel_type,
+                'price_per_liter': snapshot.price_per_liter if snapshot else None,
+                'collected_at': snapshot.collected_at if snapshot else None,
+                'source': snapshot.source if snapshot else None,
+            })
 
         if coverage_liters > 0:
             national_avg_price = expected_cost / coverage_liters
