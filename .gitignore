@@ -10,9 +10,11 @@ __pycache__/
 venv/
 .venv/
 
-# Env files
+# Env files (keep .env.example)
 .env
-.env.*
+.env.local
+.env.production
+!.env.example
 
 # Django
 backend/media/

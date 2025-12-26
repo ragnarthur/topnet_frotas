@@ -48,8 +48,9 @@ api.interceptors.response.use(
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
       try {
+        // Use the same baseURL configuration for consistency
         const response = await axios.post(
-          '/api/auth/token/refresh/',
+          `${api.defaults.baseURL}/auth/token/refresh/`,
           {},
           { withCredentials: true }
         )
