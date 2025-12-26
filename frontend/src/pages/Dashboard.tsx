@@ -22,10 +22,9 @@ import {
 } from 'lucide-react'
 import { dashboard, fuelPrices } from '@/api/client'
 import { toast } from 'sonner'
-import { formatCurrency, formatDateTime, formatNumber } from '@/lib/utils'
+import { formatCurrency, formatNumber } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import type { RealtimeEvent } from '@/types'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -47,12 +46,6 @@ export function DashboardPage() {
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => dashboard.summary(),
-  })
-  const { data: realtimeEvents = [] } = useQuery<RealtimeEvent[]>({
-    queryKey: ['realtime-events'],
-    queryFn: async () => [],
-    enabled: false,
-    initialData: [],
   })
   const fetchANPMutation = useMutation({
     mutationFn: () => fuelPrices.fetchANP(),
@@ -76,16 +69,59 @@ export function DashboardPage() {
   const avgCostPerLiter = data.summary.total_liters > 0
     ? data.summary.total_cost / data.summary.total_liters
     : 0
+  const avgCostPerTransaction = data.summary.transaction_count > 0
+    ? data.summary.total_cost / data.summary.transaction_count
+    : 0
+  const avgLitersPerTransaction = data.summary.transaction_count > 0
+    ? data.summary.total_liters / data.summary.transaction_count
+    : 0
 
   const priceRef = data.price_reference
+  const hasDelta = priceRef?.delta !== null && priceRef?.delta !== undefined
   const hasNationalAvg = priceRef?.national_avg_price !== null && priceRef?.national_avg_price !== undefined
-  const deltaValue = priceRef?.delta ?? 0
+  const deltaValue = hasDelta ? Number(priceRef?.delta ?? 0) : 0
   const deltaLabel = deltaValue > 0 ? 'Economia' : deltaValue < 0 ? 'Custo acima' : 'Neutro'
   const deltaColor = deltaValue > 0 ? 'text-emerald-400' : deltaValue < 0 ? 'text-red-400' : 'text-muted-foreground'
-  const deltaPercent = priceRef?.delta_percent ? Math.abs(priceRef.delta_percent) : 0
+  const deltaPercent = priceRef?.delta_percent !== null && priceRef?.delta_percent !== undefined
+    ? Math.abs(priceRef.delta_percent)
+    : 0
   const coveragePercent = priceRef?.coverage_ratio ? priceRef.coverage_ratio * 100 : 0
   const nationalPrices = priceRef?.national_avg_prices ?? []
-  const hasImpact = priceRef?.coverage_liters && priceRef.coverage_liters > 0
+  const hasImpact = hasDelta
+
+  const topVehicle = data.cost_by_vehicle[0]
+  const topVehicleShare = topVehicle && data.summary.total_cost > 0
+    ? (topVehicle.total_cost / data.summary.total_cost) * 100
+    : 0
+
+  const vehiclesWithEfficiency = data.cost_by_vehicle.filter((vehicle) => vehicle.km_per_liter).length
+  const avgKmPerLiter = vehiclesWithEfficiency > 0
+    ? data.cost_by_vehicle.reduce((total, vehicle) => total + (vehicle.km_per_liter ?? 0), 0) / vehiclesWithEfficiency
+    : null
+  const avgCostPerKm = vehiclesWithEfficiency > 0
+    ? data.cost_by_vehicle.reduce((total, vehicle) => total + (vehicle.cost_per_km ?? 0), 0) / vehiclesWithEfficiency
+    : null
+
+  const monthlyTrendSorted = [...data.monthly_trend].sort(
+    (a, b) => new Date(a.month).getTime() - new Date(b.month).getTime()
+  )
+  const lastMonth = monthlyTrendSorted.length > 0
+    ? monthlyTrendSorted[monthlyTrendSorted.length - 1]
+    : null
+  const previousMonth = monthlyTrendSorted.length > 1
+    ? monthlyTrendSorted[monthlyTrendSorted.length - 2]
+    : null
+  const costMoM = lastMonth && previousMonth && previousMonth.total_cost > 0
+    ? ((lastMonth.total_cost - previousMonth.total_cost) / previousMonth.total_cost) * 100
+    : null
+  const trendValue = costMoM !== null ? `${costMoM > 0 ? '+' : ''}${formatNumber(costMoM, 1)}%` : '—'
+  const trendTone = costMoM === null
+    ? 'text-muted-foreground'
+    : costMoM > 0
+      ? 'text-red-400'
+      : costMoM < 0
+        ? 'text-emerald-400'
+        : 'text-muted-foreground'
 
   const fuelTypeLabels: Record<string, string> = {
     GASOLINE: 'Gasolina',
@@ -139,30 +175,48 @@ export function DashboardPage() {
       {/* Stats Grid */}
       <motion.div
         variants={containerVariants}
-        className="grid gap-6 md:grid-cols-2 lg:grid-cols-4"
+        className="grid gap-6 md:grid-cols-2 xl:grid-cols-3"
       >
         <StatCard
-          title="Custo Total"
+          title="Gasto Total"
           value={formatCurrency(data.summary.total_cost)}
           subtitle={`${data.summary.transaction_count} abastecimentos`}
           icon={DollarSign}
-          tag="Periodo atual"
+          tag="Período atual"
           tagTone="default"
           color="blue"
         />
         <StatCard
-          title="Total de Litros"
-          value={`${formatNumber(data.summary.total_liters)} L`}
-          subtitle={`Media: ${formatCurrency(avgCostPerLiter)}/L`}
+          title="Economia vs Média"
+          value={hasDelta ? formatCurrency(Math.abs(deltaValue)) : '—'}
+          subtitle={hasDelta ? `${deltaLabel} vs média nacional` : 'Sem referência nacional'}
+          icon={ArrowUpRight}
+          tag={hasNationalAvg ? `Cobertura ${formatNumber(coveragePercent, 1)}%` : 'Sem média'}
+          tagTone={hasDelta ? (deltaValue > 0 ? 'success' : deltaValue < 0 ? 'danger' : 'default') : 'default'}
+          color={deltaValue > 0 ? 'emerald' : deltaValue < 0 ? 'red' : 'blue'}
+        />
+        <StatCard
+          title="Custo Médio/L"
+          value={formatCurrency(avgCostPerLiter)}
+          subtitle={`${formatNumber(data.summary.total_liters)} L no período`}
           icon={Droplets}
-          tag="Media calculada"
+          tag="Preço médio"
           tagTone="default"
           color="sky"
         />
         <StatCard
-          title="Veículos Ativos"
+          title="Ticket Médio"
+          value={formatCurrency(avgCostPerTransaction)}
+          subtitle={`${formatNumber(avgLitersPerTransaction)} L por abastecimento`}
+          icon={Fuel}
+          tag="Por abastecimento"
+          tagTone="default"
+          color="blue"
+        />
+        <StatCard
+          title="Frota Ativa"
           value={data.cost_by_vehicle.length.toString()}
-          subtitle="com abastecimentos"
+          subtitle={`${vehiclesWithEfficiency} veículos com eficiência`}
           icon={Car}
           tag="Frota ativa"
           tagTone="default"
@@ -175,49 +229,49 @@ export function DashboardPage() {
           icon={AlertTriangle}
           color={data.alerts.open_count > 0 ? 'red' : 'emerald'}
           alert={data.alerts.open_count > 0}
-          tag={data.alerts.open_count > 0 ? 'Atencao' : 'Sem alertas'}
+          tag={data.alerts.open_count > 0 ? 'Atenção' : 'Sem alertas'}
           tagTone={data.alerts.open_count > 0 ? 'danger' : 'success'}
         />
       </motion.div>
 
-      {/* Realtime Activity */}
+      {/* Executive Summary */}
       <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-semibold">Atividade em Tempo Real</h3>
-            <p className="text-sm text-muted-foreground">Atualizações recentes do sistema</p>
+            <h3 className="text-lg font-semibold">Resumo Executivo</h3>
+            <p className="text-sm text-muted-foreground">Indicadores para decisões de frota</p>
           </div>
-          <Badge variant="secondary">live</Badge>
+          <Badge variant="secondary">prioridades</Badge>
         </div>
-        {realtimeEvents.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Nenhuma atividade recente registrada.
-          </p>
-        ) : (
-          <div className="space-y-3">
-            {realtimeEvents.slice(0, 6).map((event) => (
-              <div key={event.id} className="flex items-start justify-between gap-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
-                <div>
-                  <p className="text-sm font-medium">
-                    {event.type === 'FUEL_TRANSACTION_CREATED' && 'Novo abastecimento registrado'}
-                    {event.type === 'FUEL_TRANSACTION_UPDATED' && 'Abastecimento atualizado'}
-                    {event.type === 'ALERT_CREATED' && `Novo alerta (${event.payload?.alert_count ?? 1})`}
-                    {event.type === 'ALERT_RESOLVED' && 'Alerta resolvido'}
-                    {event.type === 'ALERT_RESOLVED_BULK' && 'Alertas resolvidos em lote'}
-                    {event.type === 'FUEL_PRICE_UPDATED' && 'Preço de combustível atualizado'}
-                    {!['FUEL_TRANSACTION_CREATED', 'FUEL_TRANSACTION_UPDATED', 'ALERT_CREATED', 'ALERT_RESOLVED', 'ALERT_RESOLVED_BULK', 'FUEL_PRICE_UPDATED'].includes(event.type) && 'Evento recebido'}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {event.payload?.total_cost ? `Valor: ${formatCurrency(Number(event.payload.total_cost))}` : 'Atualização em tempo real'}
-                  </p>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {formatDateTime(event.timestamp)}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <InsightCard
+            title="Top consumidor"
+            value={topVehicle?.vehicle__name ?? '—'}
+            subtitle={
+              topVehicle
+                ? `${formatCurrency(topVehicle.total_cost)} • ${formatNumber(topVehicleShare, 1)}% do gasto`
+                : 'Sem dados no período'
+            }
+          />
+          <InsightCard
+            title="Ticket médio"
+            value={formatCurrency(avgCostPerTransaction)}
+            subtitle={`${formatNumber(avgLitersPerTransaction)} L por abastecimento`}
+          />
+          <InsightCard
+            title="Eficiência média"
+            value={avgKmPerLiter ? `${formatNumber(avgKmPerLiter)} km/L` : '—'}
+            subtitle={
+              avgCostPerKm ? `${formatCurrency(avgCostPerKm)} por km` : 'Sem dados de quilometragem'
+            }
+          />
+          <InsightCard
+            title="Variação mensal"
+            value={trendValue}
+            subtitle={costMoM === null ? 'Sem histórico suficiente' : 'Custo vs mês anterior'}
+            valueClassName={trendTone}
+          />
+        </div>
       </motion.div>
 
       {/* National Average Reference */}
@@ -297,8 +351,8 @@ export function DashboardPage() {
         <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-lg font-semibold">Evolucao Mensal</h3>
-              <p className="text-sm text-muted-foreground">Custo e consumo</p>
+            <h3 className="text-lg font-semibold">Evolução Mensal</h3>
+            <p className="text-sm text-muted-foreground">Custo e consumo</p>
             </div>
             <div className="flex items-center gap-4 text-sm">
               <div className="flex items-center gap-2">
@@ -383,8 +437,8 @@ export function DashboardPage() {
         <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h3 className="text-lg font-semibold">Custo por Veículo</h3>
-              <p className="text-sm text-muted-foreground">Top 5 consumidores</p>
+            <h3 className="text-lg font-semibold">Top Consumidores</h3>
+            <p className="text-sm text-muted-foreground">Veículos com maior gasto</p>
             </div>
           </div>
           <div className="h-[300px]">
@@ -436,14 +490,15 @@ export function DashboardPage() {
       {/* Vehicle Details Table */}
       <motion.div variants={itemVariants} className="glass-card rounded-2xl overflow-hidden">
         <div className="p-6 border-b border-white/10">
-          <h3 className="text-lg font-semibold">Detalhamento por Veículo</h3>
-          <p className="text-sm text-muted-foreground">Consumo e eficiência no período</p>
+          <h3 className="text-lg font-semibold">Eficiência por Veículo</h3>
+          <p className="text-sm text-muted-foreground">Custo, consumo e eficiência no período</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-white/10">
                 <th className="px-6 py-4 text-left text-sm font-medium text-muted-foreground">Veículo</th>
+                <th className="px-6 py-4 text-right text-sm font-medium text-muted-foreground">Abastecimentos</th>
                 <th className="px-6 py-4 text-right text-sm font-medium text-muted-foreground">Custo Total</th>
                 <th className="px-6 py-4 text-right text-sm font-medium text-muted-foreground">Litros</th>
                 <th className="px-6 py-4 text-right text-sm font-medium text-muted-foreground">km/L</th>
@@ -472,6 +527,9 @@ export function DashboardPage() {
                         <p className="text-sm text-muted-foreground">{vehicle.vehicle__plate}</p>
                       </div>
                     </div>
+                  </td>
+                  <td className="px-6 py-4 text-right text-muted-foreground">
+                    {formatNumber(vehicle.transaction_count, 0)}
                   </td>
                   <td className="px-6 py-4 text-right font-semibold">
                     {formatCurrency(vehicle.total_cost)}
@@ -599,6 +657,23 @@ function StatCard({ title, value, subtitle, icon: Icon, color, alert, tag, tagTo
   )
 }
 
+interface InsightCardProps {
+  title: string
+  value: string
+  subtitle: string
+  valueClassName?: string
+}
+
+function InsightCard({ title, value, subtitle, valueClassName }: InsightCardProps) {
+  return (
+    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+      <p className="text-xs text-muted-foreground">{title}</p>
+      <p className={`mt-2 text-lg font-semibold ${valueClassName ?? ''}`}>{value}</p>
+      <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+    </div>
+  )
+}
+
 function DashboardSkeleton() {
   return (
     <div className="space-y-8">
@@ -606,11 +681,12 @@ function DashboardSkeleton() {
         <div className="h-9 w-48 bg-white/5 rounded-lg animate-pulse" />
         <div className="h-5 w-64 bg-white/5 rounded-lg animate-pulse mt-2" />
       </div>
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-        {[1, 2, 3, 4].map((i) => (
+      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+        {[1, 2, 3, 4, 5, 6].map((i) => (
           <div key={i} className="glass-card rounded-2xl p-6 h-40 shimmer" />
         ))}
       </div>
+      <div className="glass-card rounded-2xl p-6 h-44 shimmer" />
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="glass-card rounded-2xl p-6 h-96 shimmer" />
         <div className="glass-card rounded-2xl p-6 h-96 shimmer" />
