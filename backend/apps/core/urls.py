@@ -2,6 +2,7 @@ from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    AuditLogViewSet,
     CostCenterViewSet,
     DriverViewSet,
     FuelStationViewSet,
@@ -14,6 +15,7 @@ router.register('vehicles', VehicleViewSet, basename='vehicle')
 router.register('drivers', DriverViewSet, basename='driver')
 router.register('cost-centers', CostCenterViewSet, basename='cost-center')
 router.register('fuel-stations', FuelStationViewSet, basename='fuel-station')
+router.register('audit-logs', AuditLogViewSet, basename='audit-log')
 
 urlpatterns = [
     path('events/stream/', event_stream, name='event-stream'),

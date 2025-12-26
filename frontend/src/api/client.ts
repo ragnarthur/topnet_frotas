@@ -2,6 +2,8 @@ import axios from 'axios'
 import type {
   Alert,
   AlertList,
+  AuditAction,
+  AuditLog,
   CostCenter,
   CostCenterList,
   DashboardSummary,
@@ -85,6 +87,19 @@ export interface UserProfile {
       fuel_type: FuelType
     } | null
   }
+}
+
+export interface AuditLogFilters {
+  action?: AuditAction
+  entity_type?: string
+  entity_id?: string
+  user?: number
+  username?: string
+  from_date?: string
+  to_date?: string
+  search?: string
+  ordering?: string
+  page?: number
 }
 
 // Driver Dashboard type
@@ -390,6 +405,14 @@ export const alerts = {
   },
   resolveBulk: async (ids: string[]): Promise<{ message: string; count: number }> => {
     const response = await api.post('/alerts/resolve_bulk/', { ids })
+    return response.data
+  },
+}
+
+// Audit Logs
+export const auditLogs = {
+  list: async (params?: AuditLogFilters): Promise<PaginatedResponse<AuditLog>> => {
+    const response = await api.get('/audit-logs/', { params })
     return response.data
   },
 }

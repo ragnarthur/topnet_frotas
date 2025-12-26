@@ -4,6 +4,7 @@ from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.core.audit import AuditMixin
 from apps.users.permissions import IsAdminUser
 from apps.core.realtime import publish_event
 
@@ -29,7 +30,7 @@ class AlertFilter(filters.FilterSet):
         fields = ['vehicle', 'type', 'severity']
 
 
-class AlertViewSet(viewsets.ModelViewSet):
+class AlertViewSet(AuditMixin, viewsets.ModelViewSet):
     queryset = Alert.objects.select_related('vehicle', 'fuel_transaction').all()
     permission_classes = [IsAdminUser]
     filterset_class = AlertFilter

@@ -12,8 +12,10 @@ from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from apps.users.permissions import IsAdminOrDriver, IsAdminUser
 
-from .models import CostCenter, Driver, FuelStation, Vehicle
+from .audit import AuditMixin
+from .models import AuditLog, CostCenter, Driver, FuelStation, Vehicle
 from .serializers import (
+    AuditLogSerializer,
     CostCenterListSerializer,
     CostCenterSerializer,
     DriverListSerializer,
@@ -23,6 +25,20 @@ from .serializers import (
     VehicleListSerializer,
     VehicleSerializer,
 )
+
+
+class AuditLogFilter(filters.FilterSet):
+    from_date = filters.DateFilter(field_name='timestamp', lookup_expr='date__gte')
+    to_date = filters.DateFilter(field_name='timestamp', lookup_expr='date__lte')
+    action = filters.CharFilter()
+    entity_type = filters.CharFilter(lookup_expr='iexact')
+    entity_id = filters.CharFilter()
+    username = filters.CharFilter(field_name='username', lookup_expr='icontains')
+    user = filters.NumberFilter(field_name='user__id')
+
+    class Meta:
+        model = AuditLog
+        fields = ['action', 'entity_type', 'entity_id', 'username', 'user']
 
 
 class VehicleFilter(filters.FilterSet):
@@ -35,7 +51,7 @@ class VehicleFilter(filters.FilterSet):
         fields = ['fuel_type', 'usage_category', 'active']
 
 
-class VehicleViewSet(viewsets.ModelViewSet):
+class VehicleViewSet(AuditMixin, viewsets.ModelViewSet):
     queryset = Vehicle.objects.all()
     serializer_class = VehicleSerializer
     permission_classes = [IsAdminOrDriver]
@@ -93,7 +109,7 @@ class DriverFilter(filters.FilterSet):
         fields = ['active']
 
 
-class DriverViewSet(viewsets.ModelViewSet):
+class DriverViewSet(AuditMixin, viewsets.ModelViewSet):
     queryset = Driver.objects.all()
     serializer_class = DriverSerializer
     permission_classes = [IsAdminUser]
@@ -124,7 +140,7 @@ class CostCenterFilter(filters.FilterSet):
         fields = ['category', 'active']
 
 
-class CostCenterViewSet(viewsets.ModelViewSet):
+class CostCenterViewSet(AuditMixin, viewsets.ModelViewSet):
     queryset = CostCenter.objects.all()
     serializer_class = CostCenterSerializer
     permission_classes = [IsAdminUser]
@@ -155,7 +171,7 @@ class FuelStationFilter(filters.FilterSet):
         fields = ['city', 'active']
 
 
-class FuelStationViewSet(viewsets.ModelViewSet):
+class FuelStationViewSet(AuditMixin, viewsets.ModelViewSet):
     queryset = FuelStation.objects.all()
     serializer_class = FuelStationSerializer
     permission_classes = [IsAdminUser]
@@ -175,6 +191,16 @@ class FuelStationViewSet(viewsets.ModelViewSet):
         stations = FuelStation.objects.filter(active=True).order_by('name')
         serializer = FuelStationListSerializer(stations, many=True)
         return Response(serializer.data)
+
+
+class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = AuditLog.objects.select_related('user').all()
+    serializer_class = AuditLogSerializer
+    permission_classes = [IsAdminUser]
+    filterset_class = AuditLogFilter
+    search_fields = ['username', 'entity_type', 'entity_description', 'entity_id', 'ip_address']
+    ordering_fields = ['timestamp', 'action', 'entity_type', 'username']
+    ordering = ['-timestamp']
 
 
 def _get_user_from_token(request):

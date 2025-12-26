@@ -313,7 +313,7 @@ export function DashboardPage() {
           </div>
           <div className="h-[300px]">
             {monthlyData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={0}>
                 <AreaChart data={monthlyData}>
                   <defs>
                     <linearGradient id="colorCusto" x1="0" y1="0" x2="0" y2="1">
@@ -389,7 +389,7 @@ export function DashboardPage() {
           </div>
           <div className="h-[300px]">
             {vehicleData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={0}>
                 <BarChart data={vehicleData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" horizontal={false} />
                   <XAxis

@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import CostCenter, Driver, FuelStation, Vehicle
+from .models import AuditLog, CostCenter, Driver, FuelStation, Vehicle
 from .utils import sanitize_text_field
 
 
@@ -118,3 +118,18 @@ class FuelStationListSerializer(serializers.ModelSerializer):
     class Meta:
         model = FuelStation
         fields = ['id', 'name', 'city', 'address', 'active']
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    action_display = serializers.CharField(
+        source='get_action_display',
+        read_only=True
+    )
+
+    class Meta:
+        model = AuditLog
+        fields = [
+            'id', 'timestamp', 'user', 'username', 'ip_address',
+            'action', 'action_display', 'entity_type', 'entity_id',
+            'entity_description', 'old_data', 'new_data', 'changes'
+        ]

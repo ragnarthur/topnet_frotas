@@ -34,12 +34,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true
     const bootstrapAuth = async () => {
+      if (!tokenStore.hasRefresh()) {
+        if (isMounted) {
+          setIsLoading(false)
+        }
+        return
+      }
       try {
         const tokens = await auth.refresh()
         if (!isMounted) {
           return
         }
         tokenStore.setAccess(tokens.access)
+        tokenStore.setRefreshAvailable(true)
         setIsAuthenticated(true)
         // Fetch user profile after successful token refresh
         await fetchProfile()
@@ -65,6 +72,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = useCallback(async (username: string, password: string) => {
     const tokens = await auth.login(username, password)
     tokenStore.setAccess(tokens.access)
+    tokenStore.setRefreshAvailable(true)
     setIsAuthenticated(true)
     // Fetch user profile after successful login
     await fetchProfile()

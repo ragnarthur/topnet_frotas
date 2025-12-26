@@ -3,8 +3,6 @@ Audit mixin for Django REST Framework ViewSets.
 Automatically logs CREATE, UPDATE, and DELETE operations.
 """
 
-from rest_framework import serializers
-
 from .models import AuditAction, AuditLog
 
 
@@ -60,7 +58,10 @@ class AuditMixin:
     def perform_create(self, serializer):
         """Log creation of new objects."""
         instance = serializer.save()
-        self._audit_log(AuditAction.CREATE, instance, new_data=serializer.data)
+        audit_serializer = self.get_audit_serializer_class()
+        new_data = model_to_dict(instance, audit_serializer)
+        self._audit_log(AuditAction.CREATE, instance, new_data=new_data)
+        return instance
 
     def perform_update(self, serializer):
         """Log updates to existing objects."""

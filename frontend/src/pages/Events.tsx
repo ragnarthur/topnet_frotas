@@ -109,7 +109,7 @@ export function EventsPage() {
       animate="visible"
       className="space-y-6"
     >
-      <motion.div variants={itemVariants} className="flex items-center justify-between">
+      <motion.div variants={itemVariants} className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-3xl font-bold">Eventos em Tempo Real</h1>
           <p className="text-muted-foreground">

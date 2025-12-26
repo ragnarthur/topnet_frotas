@@ -28,6 +28,31 @@ export interface RealtimeEvent {
   payload?: RealtimeEventPayload
 }
 
+export type AuditAction = 'CREATE' | 'UPDATE' | 'DELETE'
+
+export interface AuditChange {
+  old: unknown
+  new: unknown
+}
+
+export type AuditChanges = Record<string, AuditChange>
+
+export interface AuditLog {
+  id: string
+  timestamp: string
+  user: number | null
+  username: string
+  ip_address: string | null
+  action: AuditAction
+  action_display: string
+  entity_type: string
+  entity_id: string
+  entity_description: string
+  old_data: Record<string, unknown> | null
+  new_data: Record<string, unknown> | null
+  changes: AuditChanges | null
+}
+
 // Base types
 export interface BaseModel {
   id: string

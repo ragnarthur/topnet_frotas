@@ -15,6 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.alerts.models import Alert
+from apps.core.audit import AuditAction, AuditMixin, model_to_dict
 from apps.core.models import FuelType, UsageCategory
 from apps.users.permissions import IsAdminOrDriver, IsAdminUser, IsDriver
 
@@ -42,7 +43,7 @@ class FuelTransactionFilter(filters.FilterSet):
         fields = ['vehicle', 'driver', 'cost_center', 'station', 'fuel_type']
 
 
-class FuelTransactionViewSet(viewsets.ModelViewSet):
+class FuelTransactionViewSet(AuditMixin, viewsets.ModelViewSet):
     queryset = FuelTransaction.objects.select_related(
         'vehicle', 'driver', 'station', 'cost_center'
     ).all()
@@ -51,6 +52,7 @@ class FuelTransactionViewSet(viewsets.ModelViewSet):
     search_fields = ['vehicle__name', 'vehicle__plate', 'notes']
     ordering_fields = ['purchased_at', 'total_cost', 'liters', 'odometer_km']
     ordering = ['-purchased_at']
+    audit_serializer_class = FuelTransactionSerializer
 
     def get_queryset(self):
         """Filter queryset based on user role."""
@@ -88,8 +90,11 @@ class FuelTransactionViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         if user.is_staff:
-            serializer.save()
-            return
+            instance = serializer.save()
+            audit_serializer = self.get_audit_serializer_class()
+            new_data = model_to_dict(instance, audit_serializer)
+            self._audit_log(AuditAction.CREATE, instance, new_data=new_data)
+            return instance
 
         driver = getattr(user, 'driver_profile', None)
         if not driver:
@@ -106,7 +111,11 @@ class FuelTransactionViewSet(viewsets.ModelViewSet):
                 'vehicle': 'Motorista só pode registrar abastecimento do veículo atual.'
             })
 
-        serializer.save(driver=driver, vehicle=driver.current_vehicle)
+        instance = serializer.save(driver=driver, vehicle=driver.current_vehicle)
+        audit_serializer = self.get_audit_serializer_class()
+        new_data = model_to_dict(instance, audit_serializer)
+        self._audit_log(AuditAction.CREATE, instance, new_data=new_data)
+        return instance
 
     def update(self, request, *args, **kwargs):
         if not request.user.is_staff:
