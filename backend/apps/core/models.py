@@ -160,3 +160,94 @@ class FuelStation(BaseModel):
         if self.city:
             return f'{self.name} - {self.city}'
         return self.name
+
+
+class AuditAction(models.TextChoices):
+    CREATE = 'CREATE', 'Criação'
+    UPDATE = 'UPDATE', 'Alteração'
+    DELETE = 'DELETE', 'Exclusão'
+
+
+class AuditLog(models.Model):
+    """
+    Audit log for tracking all changes in the system.
+    Records who did what, when, and the before/after state.
+    """
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    timestamp = models.DateTimeField('Data/Hora', auto_now_add=True, db_index=True)
+
+    # Who
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='audit_logs',
+        verbose_name='Usuário'
+    )
+    username = models.CharField('Nome do Usuário', max_length=150, blank=True)
+    ip_address = models.GenericIPAddressField('Endereço IP', null=True, blank=True)
+
+    # What
+    action = models.CharField(
+        'Ação',
+        max_length=10,
+        choices=AuditAction.choices,
+        db_index=True
+    )
+    entity_type = models.CharField('Tipo de Entidade', max_length=100, db_index=True)
+    entity_id = models.CharField('ID da Entidade', max_length=100)
+    entity_description = models.CharField('Descrição', max_length=300, blank=True)
+
+    # Data snapshots (JSON)
+    old_data = models.JSONField('Dados Anteriores', null=True, blank=True)
+    new_data = models.JSONField('Dados Novos', null=True, blank=True)
+    changes = models.JSONField('Alterações', null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Log de Auditoria'
+        verbose_name_plural = 'Logs de Auditoria'
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['entity_type', 'entity_id']),
+            models.Index(fields=['user', 'timestamp']),
+        ]
+
+    def __str__(self):
+        return f'{self.get_action_display()} - {self.entity_type} - {self.timestamp}'
+
+    @classmethod
+    def log(cls, user, action, entity, old_data=None, new_data=None, ip_address=None):
+        """
+        Create an audit log entry.
+
+        Args:
+            user: The user performing the action
+            action: AuditAction (CREATE, UPDATE, DELETE)
+            entity: The model instance being modified
+            old_data: Dict of old values (for UPDATE/DELETE)
+            new_data: Dict of new values (for CREATE/UPDATE)
+            ip_address: Client IP address
+        """
+        # Calculate changes for updates
+        changes = None
+        if action == AuditAction.UPDATE and old_data and new_data:
+            changes = {}
+            for key in set(list(old_data.keys()) + list(new_data.keys())):
+                old_val = old_data.get(key)
+                new_val = new_data.get(key)
+                if old_val != new_val:
+                    changes[key] = {'old': old_val, 'new': new_val}
+
+        return cls.objects.create(
+            user=user,
+            username=user.username if user else 'Sistema',
+            ip_address=ip_address,
+            action=action,
+            entity_type=entity.__class__.__name__,
+            entity_id=str(entity.pk),
+            entity_description=str(entity)[:300],
+            old_data=old_data,
+            new_data=new_data,
+            changes=changes,
+        )

@@ -25,6 +25,7 @@ import { toast } from 'sonner'
 import { formatCurrency, formatDateTime, formatNumber } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import type { RealtimeEvent } from '@/types'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -47,7 +48,7 @@ export function DashboardPage() {
     queryKey: ['dashboard'],
     queryFn: () => dashboard.summary(),
   })
-  const { data: realtimeEvents = [] } = useQuery({
+  const { data: realtimeEvents = [] } = useQuery<RealtimeEvent[]>({
     queryKey: ['realtime-events'],
     queryFn: async () => [],
     enabled: false,
@@ -194,7 +195,7 @@ export function DashboardPage() {
           </p>
         ) : (
           <div className="space-y-3">
-            {realtimeEvents.slice(0, 6).map((event: any) => (
+            {realtimeEvents.slice(0, 6).map((event) => (
               <div key={event.id} className="flex items-start justify-between gap-4 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
                 <div>
                   <p className="text-sm font-medium">

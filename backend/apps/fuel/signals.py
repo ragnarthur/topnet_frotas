@@ -5,10 +5,13 @@ After each FuelTransaction is created/updated:
 1. Update FuelPriceSnapshot with the new price
 2. Generate consistency alerts (odometer regression, over tank capacity, etc.)
 3. Publish event to Redis for realtime updates (optional)
+4. Send email notification for critical alerts
 """
 
 import logging
 
+from django.conf import settings
+from django.core.mail import send_mail
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
@@ -19,6 +22,42 @@ from apps.core.realtime import publish_event
 from .models import FuelPriceSnapshot, FuelPriceSource, FuelTransaction
 
 logger = logging.getLogger(__name__)
+
+
+def send_alert_email(alert):
+    """Send email notification for critical alerts."""
+    recipients = getattr(settings, 'ALERT_NOTIFICATION_EMAILS', [])
+    if not recipients:
+        logger.debug("No ALERT_NOTIFICATION_EMAILS configured, skipping email")
+        return
+
+    subject = f"[TopNet Frotas] Alerta Crítico: {alert.vehicle.name}"
+    message = f"""
+Alerta Crítico Detectado
+
+Veículo: {alert.vehicle.name} ({alert.vehicle.plate})
+Tipo: {alert.get_type_display()}
+Severidade: {alert.get_severity_display()}
+
+Mensagem:
+{alert.message}
+
+---
+Este é um email automático do sistema TopNet Frotas.
+Acesse o painel para mais detalhes.
+"""
+
+    try:
+        send_mail(
+            subject=subject,
+            message=message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=recipients,
+            fail_silently=True,
+        )
+        logger.info(f"Sent alert email to {recipients}")
+    except Exception as e:
+        logger.error(f"Failed to send alert email: {e}")
 
 
 @receiver(post_save, sender=FuelTransaction)
@@ -154,6 +193,9 @@ def generate_consistency_alerts(sender, instance, created, **kwargs):
         severity_counts = {}
         for alert in alerts_to_create:
             severity_counts[alert.severity] = severity_counts.get(alert.severity, 0) + 1
+            # Send email for critical alerts
+            if alert.severity == AlertSeverity.CRITICAL:
+                send_alert_email(alert)
 
         publish_event({
             'type': 'ALERT_CREATED',

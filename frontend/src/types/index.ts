@@ -4,6 +4,29 @@ export type UsageCategory = 'OPERATIONAL' | 'PERSONAL'
 export type CostCenterCategory = 'RURAL' | 'URBAN' | 'INSTALLATION' | 'MAINTENANCE' | 'ADMIN'
 export type AlertType = 'ODOMETER_REGRESSION' | 'LITERS_OVER_TANK' | 'OUTLIER_CONSUMPTION' | 'PERSONAL_USAGE'
 export type AlertSeverity = 'INFO' | 'WARN' | 'CRITICAL'
+export type RealtimeEventType =
+  | 'FUEL_TRANSACTION_CREATED'
+  | 'FUEL_TRANSACTION_UPDATED'
+  | 'ALERT_CREATED'
+  | 'ALERT_RESOLVED'
+  | 'ALERT_RESOLVED_BULK'
+  | 'FUEL_PRICE_UPDATED'
+  | 'EVENT'
+
+export interface RealtimeEventPayload {
+  vehicle_id?: string
+  alert_count?: number
+  severity_counts?: Partial<Record<AlertSeverity, number>>
+  total_cost?: number
+  [key: string]: unknown
+}
+
+export interface RealtimeEvent {
+  id: string
+  type: RealtimeEventType | string
+  timestamp: string
+  payload?: RealtimeEventPayload
+}
 
 // Base types
 export interface BaseModel {

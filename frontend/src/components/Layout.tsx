@@ -24,6 +24,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { tokenStore } from '@/lib/tokenStore'
 import { toast } from 'sonner'
+import type { RealtimeEvent, RealtimeEventPayload } from '@/types'
 
 interface NavItem {
   name: string
@@ -64,17 +65,17 @@ export function Layout({ children }: LayoutProps) {
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null
     let stopped = false
 
-    const pushEvent = (payload: Record<string, unknown>) => {
+    const pushEvent = (payload: RealtimeEventPayload) => {
       const eventId = String(payload.event_id ?? `${payload.type || 'event'}-${payload.timestamp || Date.now()}`)
-      const nextEvent = {
+      const nextEvent: RealtimeEvent = {
         id: eventId,
         type: String(payload.type || 'EVENT'),
         timestamp: String(payload.timestamp || new Date().toISOString()),
         payload,
       }
-      queryClient.setQueryData(
+      queryClient.setQueryData<RealtimeEvent[]>(
         ['realtime-events'],
-        (old: Array<typeof nextEvent> = []) => [nextEvent, ...old].slice(0, 20)
+        (old = []) => [nextEvent, ...old].slice(0, 20)
       )
     }
 
@@ -102,7 +103,7 @@ export function Layout({ children }: LayoutProps) {
 
       source.onmessage = (event) => {
         try {
-          const payload = JSON.parse(event.data)
+          const payload = JSON.parse(event.data) as RealtimeEventPayload
           pushEvent(payload)
 
           if (payload?.type === 'FUEL_TRANSACTION_CREATED') {

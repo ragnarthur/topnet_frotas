@@ -6,6 +6,7 @@ import { vehicles } from '@/api/client'
 import { formatDateTime } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import type { AlertSeverity, RealtimeEvent } from '@/types'
 import {
   Select,
   SelectContent,
@@ -27,7 +28,7 @@ const itemVariants = {
   visible: { opacity: 1, y: 0 }
 }
 
-const SEVERITY_OPTIONS = ['INFO', 'WARN', 'CRITICAL'] as const
+const SEVERITY_OPTIONS: AlertSeverity[] = ['INFO', 'WARN', 'CRITICAL']
 
 const TYPE_LABELS: Record<string, string> = {
   FUEL_TRANSACTION_CREATED: 'Novo abastecimento',
@@ -48,11 +49,11 @@ const TYPE_ICONS: Record<string, React.ElementType> = {
 }
 
 export function EventsPage() {
-  const [typeFilter, setTypeFilter] = useState('ALL')
+  const [typeFilter, setTypeFilter] = useState<RealtimeEvent['type'] | 'ALL'>('ALL')
   const [vehicleFilter, setVehicleFilter] = useState('ALL')
-  const [severityFilter, setSeverityFilter] = useState('ALL')
+  const [severityFilter, setSeverityFilter] = useState<AlertSeverity | 'ALL'>('ALL')
 
-  const { data: events = [] } = useQuery({
+  const { data: events = [] } = useQuery<RealtimeEvent[]>({
     queryKey: ['realtime-events'],
     queryFn: async () => [],
     enabled: false,
@@ -65,7 +66,7 @@ export function EventsPage() {
   })
 
   const eventTypes = useMemo(() => {
-    const types = Array.from(new Set(events.map((event: any) => event.type)))
+    const types = Array.from(new Set(events.map((event) => event.type)))
     return types.sort()
   }, [events])
 
@@ -78,7 +79,7 @@ export function EventsPage() {
   }, [vehiclesList])
 
   const filteredEvents = useMemo(() => {
-    return events.filter((event: any) => {
+    return events.filter((event) => {
       if (typeFilter !== 'ALL' && event.type !== typeFilter) {
         return false
       }
@@ -192,7 +193,7 @@ export function EventsPage() {
           </p>
         ) : (
           <div className="space-y-3">
-            {filteredEvents.map((event: any) => {
+            {filteredEvents.map((event) => {
               const Icon = TYPE_ICONS[event.type] || Activity
               const vehicleName = event.payload?.vehicle_id
                 ? vehicleMap.get(event.payload.vehicle_id)
