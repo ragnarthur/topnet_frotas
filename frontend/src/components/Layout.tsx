@@ -18,6 +18,7 @@ import {
   FileText,
   ClipboardList,
   MoreHorizontal,
+  Upload,
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
@@ -39,6 +40,7 @@ interface NavItem {
 const allNavigation: NavItem[] = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Abastecimentos', href: '/abastecimentos', icon: Fuel },
+  { name: 'Importar CSV', href: '/importar', icon: Upload, adminOnly: true },
   { name: 'Eventos', href: '/eventos', icon: Activity, adminOnly: true },
   { name: 'Relatórios', href: '/relatorios', icon: FileText, adminOnly: true },
   { name: 'Auditoria', href: '/auditoria', icon: ClipboardList, adminOnly: true },

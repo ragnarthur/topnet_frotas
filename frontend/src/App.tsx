@@ -25,6 +25,7 @@ const CostCentersPage = lazy(() => import('@/pages/CostCenters').then(m => ({ de
 const StationsPage = lazy(() => import('@/pages/Stations').then(m => ({ default: m.StationsPage })))
 const AlertsPage = lazy(() => import('@/pages/Alerts').then(m => ({ default: m.AlertsPage })))
 const AuditPage = lazy(() => import('@/pages/Audit').then(m => ({ default: m.AuditPage })))
+const ImportPage = lazy(() => import('@/pages/Import'))
 
 // Loading component
 function PageLoader() {
@@ -183,6 +184,12 @@ const auditRoute = createRoute({
   component: () => <AdminRoute><LazyPage><AuditPage /></LazyPage></AdminRoute>,
 })
 
+const importRoute = createRoute({
+  getParentRoute: () => protectedRoute,
+  path: '/importar',
+  component: () => <AdminRoute><LazyPage><ImportPage /></LazyPage></AdminRoute>,
+})
+
 // Create route tree
 const routeTree = rootRoute.addChildren([
   loginRoute,
@@ -197,6 +204,7 @@ const routeTree = rootRoute.addChildren([
     eventsRoute,
     reportsRoute,
     auditRoute,
+    importRoute,
   ]),
 ])
 

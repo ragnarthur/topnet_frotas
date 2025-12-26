@@ -378,6 +378,83 @@ export const reports = {
   },
 }
 
+// Import Types
+export interface ImportError {
+  row: number
+  column: string
+  value: string
+  message: string
+}
+
+export interface ImportedTransaction {
+  row: number
+  transaction_id: string
+  vehicle_plate: string
+  purchased_at: string
+  liters: string
+  total_cost: string
+}
+
+export interface ImportResult {
+  success: boolean
+  summary: {
+    total_rows: number
+    imported: number
+    skipped: number
+    errors: number
+  }
+  imported: ImportedTransaction[]
+  skipped: Array<{ row: number; reason: string }>
+  errors: ImportError[]
+}
+
+export interface CSVColumnSpec {
+  name: string
+  required: boolean
+  description: string
+  example: string
+  default?: string
+}
+
+export interface CSVFormatSpec {
+  encoding: string
+  delimiter: string
+  decimal_separator: string
+  date_formats: string[]
+  columns: CSVColumnSpec[]
+  notes: string[]
+}
+
+// Import
+export const imports = {
+  uploadCSV: async (file: File): Promise<ImportResult> => {
+    const formData = new FormData()
+    formData.append('file', file)
+    const response = await api.post('/import/transactions/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return response.data
+  },
+  downloadTemplate: async (): Promise<{ blob: Blob; filename: string }> => {
+    const response = await api.get('/import/transactions/template/', {
+      responseType: 'blob',
+    })
+    const disposition = response.headers['content-disposition'] as string | undefined
+    let filename = 'modelo_importacao_abastecimentos.csv'
+    if (disposition) {
+      const match = disposition.match(/filename="([^"]+)"/)
+      if (match?.[1]) {
+        filename = match[1]
+      }
+    }
+    return { blob: response.data, filename }
+  },
+  getFormat: async (): Promise<CSVFormatSpec> => {
+    const response = await api.get('/import/transactions/format/')
+    return response.data
+  },
+}
+
 // Alerts
 export const alerts = {
   list: async (params?: {

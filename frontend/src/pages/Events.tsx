@@ -155,7 +155,7 @@ export function EventsPage() {
           </div>
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">Severidade</p>
-            <Select value={severityFilter} onValueChange={setSeverityFilter}>
+            <Select value={severityFilter} onValueChange={(v) => setSeverityFilter(v as AlertSeverity | 'ALL')}>
               <SelectTrigger>
                 <SelectValue placeholder="Todas" />
               </SelectTrigger>
@@ -215,7 +215,7 @@ export function EventsPage() {
                         <div className="mt-2 flex flex-wrap gap-2">
                           {SEVERITY_OPTIONS.map((severity) => (
                             <Badge key={severity} variant="outline">
-                              {severity}: {event.payload.severity_counts[severity] || 0}
+                              {severity}: {event.payload?.severity_counts?.[severity] || 0}
                             </Badge>
                           ))}
                         </div>

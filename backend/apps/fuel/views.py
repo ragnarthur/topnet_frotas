@@ -11,6 +11,7 @@ from django.http import HttpResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
+from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -26,6 +27,11 @@ from .serializers import (
     FuelTransactionListSerializer,
     FuelTransactionSerializer,
     NationalFuelPriceUpsertSerializer,
+)
+from .services import (
+    generate_csv_template,
+    get_csv_format_specification,
+    import_fuel_transactions,
 )
 
 
@@ -589,3 +595,67 @@ class DriverDashboardView(APIView):
             },
             'recent_transactions': recent_transactions,
         })
+
+
+class FuelTransactionsImportView(APIView):
+    """
+    Import fuel transactions from CSV file.
+
+    Accepts multipart/form-data with a 'file' field containing the CSV.
+    Returns a detailed report of the import operation.
+    """
+    permission_classes = [IsAdminUser]
+    parser_classes = [MultiPartParser]
+
+    def post(self, request):
+        file = request.FILES.get('file')
+        if not file:
+            return Response(
+                {'error': 'Arquivo CSV e obrigatorio.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate file extension
+        filename = file.name.lower()
+        if not filename.endswith('.csv'):
+            return Response(
+                {'error': 'Arquivo deve ser no formato CSV.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Validate file size (max 10MB)
+        if file.size > 10 * 1024 * 1024:
+            return Response(
+                {'error': 'Arquivo muito grande. Maximo permitido: 10MB.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            result = import_fuel_transactions(file.read())
+            response_status = status.HTTP_200_OK if result.success else status.HTTP_400_BAD_REQUEST
+            return Response(result.to_dict(), status=response_status)
+        except Exception as e:
+            return Response(
+                {'error': f'Erro ao processar arquivo: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class FuelTransactionsImportTemplateView(APIView):
+    """Download CSV template for fuel transactions import."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        template = generate_csv_template()
+
+        response = HttpResponse(template, content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = 'attachment; filename="modelo_importacao_abastecimentos.csv"'
+        return response
+
+
+class FuelTransactionsImportFormatView(APIView):
+    """Get CSV format specification for documentation."""
+    permission_classes = [IsAdminUser]
+
+    def get(self, request):
+        return Response(get_csv_format_specification())
