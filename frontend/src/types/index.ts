@@ -264,6 +264,13 @@ export interface DashboardSummary {
     km_per_liter: number | null
     cost_per_km: number | null
   }>
+  cost_by_cost_center: Array<{
+    cost_center__id: string | null
+    cost_center__name: string
+    total_cost: number
+    total_liters: number
+    transaction_count: number
+  }>
   monthly_trend: Array<{
     month: string
     total_cost: number

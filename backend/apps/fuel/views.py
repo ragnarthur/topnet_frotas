@@ -293,6 +293,32 @@ class DashboardSummaryView(APIView):
             ).order_by('-total_cost')
         )
 
+        # Cost by cost center (important for accounting)
+        cost_by_cost_center = list(
+            transactions.filter(cost_center__isnull=False).values(
+                'cost_center__id', 'cost_center__name'
+            ).annotate(
+                total_cost=Sum('total_cost'),
+                total_liters=Sum('liters'),
+                transaction_count=Count('id')
+            ).order_by('-total_cost')
+        )
+
+        # Cost without cost center assigned
+        without_cost_center = transactions.filter(cost_center__isnull=True).aggregate(
+            total_cost=Sum('total_cost'),
+            total_liters=Sum('liters'),
+            transaction_count=Count('id')
+        )
+        if without_cost_center['total_cost']:
+            cost_by_cost_center.append({
+                'cost_center__id': None,
+                'cost_center__name': 'Sem centro de custo',
+                'total_cost': without_cost_center['total_cost'],
+                'total_liters': without_cost_center['total_liters'],
+                'transaction_count': without_cost_center['transaction_count'],
+            })
+
         # Calculate km/L and cost/km for each vehicle
         for item in cost_by_vehicle:
             vehicle_id = item['vehicle__id']
@@ -417,6 +443,7 @@ class DashboardSummaryView(APIView):
                 'delta_percent': delta_percent,
             },
             'cost_by_vehicle': cost_by_vehicle,
+            'cost_by_cost_center': cost_by_cost_center,
             'monthly_trend': monthly_trend,
             'alerts': {
                 'open_count': alerts_open_count,

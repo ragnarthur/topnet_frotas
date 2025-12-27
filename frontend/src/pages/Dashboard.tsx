@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
   AreaChart,
@@ -8,54 +8,43 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  BarChart,
-  Bar,
+  PieChart,
+  Pie,
   Cell,
 } from 'recharts'
 import {
   AlertTriangle,
-  Car,
-  DollarSign,
-  Droplets,
+  TrendingUp,
+  TrendingDown,
   Fuel,
-  ArrowUpRight,
+  Calendar,
+  Banknote,
+  Droplets,
+  Car,
 } from 'lucide-react'
-import { dashboard, fuelPrices } from '@/api/client'
-import { toast } from 'sonner'
+import { dashboard } from '@/api/client'
 import { formatCurrency, formatNumber } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 
 const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.1 }
+    transition: { staggerChildren: 0.08 }
   }
 }
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
+  hidden: { opacity: 0, y: 16 },
   visible: { opacity: 1, y: 0 }
 }
 
-const COLORS = ['#3b82f6', '#38bdf8', '#10b981', '#f59e0b', '#ef4444']
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899']
 
 export function DashboardPage() {
-  const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => dashboard.summary(),
-  })
-  const fetchANPMutation = useMutation({
-    mutationFn: () => fuelPrices.fetchANP(),
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] })
-      toast.success(`Preços ANP atualizados! ${data.prices_updated.length} combustíveis.`)
-    },
-    onError: () => {
-      toast.error('Erro ao buscar preços da ANP')
-    },
   })
 
   if (isLoading) {
@@ -63,90 +52,42 @@ export function DashboardPage() {
   }
 
   if (!data) {
-    return <div>Erro ao carregar dados</div>
+    return <div className="text-center py-12 text-muted-foreground">Erro ao carregar dados</div>
   }
 
-  const avgCostPerLiter = data.summary.total_liters > 0
+  // Cálculos básicos
+  const custoMedioLitro = data.summary.total_liters > 0
     ? data.summary.total_cost / data.summary.total_liters
     : 0
-  const avgCostPerTransaction = data.summary.transaction_count > 0
-    ? data.summary.total_cost / data.summary.transaction_count
-    : 0
-  const avgLitersPerTransaction = data.summary.transaction_count > 0
-    ? data.summary.total_liters / data.summary.transaction_count
-    : 0
 
-  const priceRef = data.price_reference
-  const hasDelta = priceRef?.delta !== null && priceRef?.delta !== undefined
-  const hasNationalAvg = priceRef?.national_avg_price !== null && priceRef?.national_avg_price !== undefined
-  const deltaValue = hasDelta ? Number(priceRef?.delta ?? 0) : 0
-  const deltaLabel = deltaValue > 0 ? 'Economia' : deltaValue < 0 ? 'Custo acima' : 'Neutro'
-  const deltaColor = deltaValue > 0 ? 'text-emerald-400' : deltaValue < 0 ? 'text-red-400' : 'text-muted-foreground'
-  const deltaPercent = priceRef?.delta_percent !== null && priceRef?.delta_percent !== undefined
-    ? Math.abs(priceRef.delta_percent)
-    : 0
-  const coveragePercent = priceRef?.coverage_ratio ? priceRef.coverage_ratio * 100 : 0
-  const nationalPrices = priceRef?.national_avg_prices ?? []
-  const hasImpact = hasDelta
+  const diasNoPeriodo = Math.max(1, Math.ceil(
+    (new Date(data.period.to).getTime() - new Date(data.period.from).getTime()) / (1000 * 60 * 60 * 24)
+  ) + 1)
 
-  const topVehicle = data.cost_by_vehicle[0]
-  const topVehicleShare = topVehicle && data.summary.total_cost > 0
-    ? (topVehicle.total_cost / data.summary.total_cost) * 100
-    : 0
+  const gastoMedioDiario = data.summary.total_cost / diasNoPeriodo
 
-  const vehiclesWithEfficiency = data.cost_by_vehicle.filter((vehicle) => vehicle.km_per_liter).length
-  const avgKmPerLiter = vehiclesWithEfficiency > 0
-    ? data.cost_by_vehicle.reduce((total, vehicle) => total + (vehicle.km_per_liter ?? 0), 0) / vehiclesWithEfficiency
-    : null
-  const avgCostPerKm = vehiclesWithEfficiency > 0
-    ? data.cost_by_vehicle.reduce((total, vehicle) => total + (vehicle.cost_per_km ?? 0), 0) / vehiclesWithEfficiency
-    : null
-
+  // Variação mensal
   const monthlyTrendSorted = [...data.monthly_trend].sort(
     (a, b) => new Date(a.month).getTime() - new Date(b.month).getTime()
   )
-  const lastMonth = monthlyTrendSorted.length > 0
-    ? monthlyTrendSorted[monthlyTrendSorted.length - 1]
-    : null
-  const previousMonth = monthlyTrendSorted.length > 1
-    ? monthlyTrendSorted[monthlyTrendSorted.length - 2]
-    : null
-  const costMoM = lastMonth && previousMonth && previousMonth.total_cost > 0
-    ? ((lastMonth.total_cost - previousMonth.total_cost) / previousMonth.total_cost) * 100
-    : null
-  const trendValue = costMoM !== null ? `${costMoM > 0 ? '+' : ''}${formatNumber(costMoM, 1)}%` : '—'
-  const trendTone = costMoM === null
-    ? 'text-muted-foreground'
-    : costMoM > 0
-      ? 'text-red-400'
-      : costMoM < 0
-        ? 'text-emerald-400'
-        : 'text-muted-foreground'
+  const mesAtual = monthlyTrendSorted[monthlyTrendSorted.length - 1]
+  const mesAnterior = monthlyTrendSorted[monthlyTrendSorted.length - 2]
 
-  const fuelTypeLabels: Record<string, string> = {
-    GASOLINE: 'Gasolina',
-    ETHANOL: 'Etanol',
-    DIESEL: 'Diesel',
-  }
+  const variacaoMensal = mesAtual && mesAnterior && mesAnterior.total_cost > 0
+    ? ((mesAtual.total_cost - mesAnterior.total_cost) / mesAnterior.total_cost) * 100
+    : null
 
-  const monthlyData = data.monthly_trend.map(item => ({
-    month: new Date(item.month).toLocaleDateString('pt-BR', { month: 'short' }),
-    custo: Number(item.total_cost),
-    litros: Number(item.total_liters),
+  // Dados para gráficos
+  const monthlyData = monthlyTrendSorted.map(item => ({
+    mes: new Date(item.month).toLocaleDateString('pt-BR', { month: 'short' }),
+    valor: Number(item.total_cost),
   }))
 
-  const vehicleData = data.cost_by_vehicle.slice(0, 5).map(v => ({
-    name: v.vehicle__name,
-    custo: Number(v.total_cost),
-    litros: Number(v.total_liters),
+  const costCenterData = data.cost_by_cost_center.map((item, index) => ({
+    name: item.cost_center__name,
+    value: Number(item.total_cost),
+    color: COLORS[index % COLORS.length],
   }))
-
-  const getGreeting = () => {
-    const hour = new Date().getHours()
-    if (hour < 12) return 'Bom dia!'
-    if (hour < 18) return 'Boa tarde!'
-    return 'Boa noite!'
-  }
 
   const getCurrentMonthYear = () => {
     return new Date().toLocaleDateString('pt-BR', {
@@ -160,536 +101,336 @@ export function DashboardPage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="space-y-8"
+      className="space-y-6"
     >
       {/* Header */}
-      <motion.div variants={itemVariants} className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold">
-          <span className="gradient-text">{getGreeting()}</span>
-        </h1>
+      <motion.div variants={itemVariants}>
+        <h1 className="text-2xl font-bold">Painel de Controle</h1>
         <p className="text-muted-foreground">
-          Resumo de {getCurrentMonthYear()}
+          Resumo financeiro de {getCurrentMonthYear()}
         </p>
       </motion.div>
 
-      {/* Stats Grid */}
-      <motion.div
-        variants={containerVariants}
-        className="grid gap-6 md:grid-cols-2 xl:grid-cols-3"
-      >
-        <StatCard
-          title="Gasto Total"
+      {/* Cards Principais - Resumo Financeiro */}
+      <motion.div variants={itemVariants} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <SummaryCard
+          title="Gasto Total no Mês"
           value={formatCurrency(data.summary.total_cost)}
           subtitle={`${data.summary.transaction_count} abastecimentos`}
-          icon={DollarSign}
-          tag="Período atual"
-          tagTone="default"
-          color="blue"
+          icon={Banknote}
+          highlight
         />
-        <StatCard
-          title="Economia vs Média"
-          value={hasDelta ? formatCurrency(Math.abs(deltaValue)) : '—'}
-          subtitle={hasDelta ? `${deltaLabel} vs média nacional` : 'Sem referência nacional'}
-          icon={ArrowUpRight}
-          tag={hasNationalAvg ? `Cobertura ${formatNumber(coveragePercent, 1)}%` : 'Sem média'}
-          tagTone={hasDelta ? (deltaValue > 0 ? 'success' : deltaValue < 0 ? 'danger' : 'default') : 'default'}
-          color={deltaValue > 0 ? 'emerald' : deltaValue < 0 ? 'red' : 'blue'}
-        />
-        <StatCard
-          title="Custo Médio/L"
-          value={formatCurrency(avgCostPerLiter)}
-          subtitle={`${formatNumber(data.summary.total_liters)} L no período`}
+        <SummaryCard
+          title="Total de Litros"
+          value={`${formatNumber(data.summary.total_liters)} L`}
+          subtitle={`Custo médio: ${formatCurrency(custoMedioLitro)}/L`}
           icon={Droplets}
-          tag="Preço médio"
-          tagTone="default"
-          color="sky"
         />
-        <StatCard
-          title="Ticket Médio"
-          value={formatCurrency(avgCostPerTransaction)}
-          subtitle={`${formatNumber(avgLitersPerTransaction)} L por abastecimento`}
-          icon={Fuel}
-          tag="Por abastecimento"
-          tagTone="default"
-          color="blue"
+        <SummaryCard
+          title="Gasto Médio/Dia"
+          value={formatCurrency(gastoMedioDiario)}
+          subtitle={`${diasNoPeriodo} dias no período`}
+          icon={Calendar}
         />
-        <StatCard
-          title="Frota Ativa"
-          value={data.cost_by_vehicle.length.toString()}
-          subtitle={`${vehiclesWithEfficiency} veículos com eficiência`}
-          icon={Car}
-          tag="Frota ativa"
-          tagTone="default"
-          color="emerald"
-        />
-        <StatCard
-          title="Alertas Abertos"
-          value={data.alerts.open_count.toString()}
-          subtitle="pendentes"
-          icon={AlertTriangle}
-          color={data.alerts.open_count > 0 ? 'red' : 'emerald'}
-          alert={data.alerts.open_count > 0}
-          tag={data.alerts.open_count > 0 ? 'Atenção' : 'Sem alertas'}
-          tagTone={data.alerts.open_count > 0 ? 'danger' : 'success'}
+        <SummaryCard
+          title="Variação vs Mês Anterior"
+          value={variacaoMensal !== null ? `${variacaoMensal > 0 ? '+' : ''}${formatNumber(variacaoMensal, 1)}%` : '—'}
+          subtitle={variacaoMensal !== null
+            ? (variacaoMensal > 0 ? 'Aumento de gastos' : variacaoMensal < 0 ? 'Redução de gastos' : 'Estável')
+            : 'Sem dados anteriores'
+          }
+          icon={variacaoMensal !== null && variacaoMensal > 0 ? TrendingUp : TrendingDown}
+          trend={variacaoMensal !== null ? (variacaoMensal > 0 ? 'up' : variacaoMensal < 0 ? 'down' : 'neutral') : 'neutral'}
         />
       </motion.div>
 
-      {/* Executive Summary */}
-      <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-semibold">Resumo Executivo</h3>
-            <p className="text-sm text-muted-foreground">Indicadores para decisões de frota</p>
+      {/* Alertas (se houver) */}
+      {data.alerts.open_count > 0 && (
+        <motion.div variants={itemVariants} className="glass-card rounded-xl p-4 border-l-4 border-amber-500 bg-amber-500/10">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-500" />
+            <div>
+              <p className="font-medium">Atenção: {data.alerts.open_count} alerta{data.alerts.open_count > 1 ? 's' : ''} pendente{data.alerts.open_count > 1 ? 's' : ''}</p>
+              <p className="text-sm text-muted-foreground">Verifique inconsistências nos abastecimentos</p>
+            </div>
           </div>
-          <Badge variant="secondary">prioridades</Badge>
-        </div>
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          <InsightCard
-            title="Top consumidor"
-            value={topVehicle?.vehicle__name ?? '—'}
-            subtitle={
-              topVehicle
-                ? `${formatCurrency(topVehicle.total_cost)} • ${formatNumber(topVehicleShare, 1)}% do gasto`
-                : 'Sem dados no período'
-            }
-          />
-          <InsightCard
-            title="Ticket médio"
-            value={formatCurrency(avgCostPerTransaction)}
-            subtitle={`${formatNumber(avgLitersPerTransaction)} L por abastecimento`}
-          />
-          <InsightCard
-            title="Eficiência média"
-            value={avgKmPerLiter ? `${formatNumber(avgKmPerLiter)} km/L` : '—'}
-            subtitle={
-              avgCostPerKm ? `${formatCurrency(avgCostPerKm)} por km` : 'Sem dados de quilometragem'
-            }
-          />
-          <InsightCard
-            title="Variação mensal"
-            value={trendValue}
-            subtitle={costMoM === null ? 'Sem histórico suficiente' : 'Custo vs mês anterior'}
-            valueClassName={trendTone}
-          />
-        </div>
-      </motion.div>
+        </motion.div>
+      )}
 
-      {/* National Average Reference */}
-      <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-lg font-semibold">Preço Médio Nacional</h3>
-            <p className="text-sm text-muted-foreground">Referência para avaliação de ganhos/perdas</p>
+      {/* Seção Principal - 2 Colunas */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        {/* Gastos por Centro de Custo */}
+        <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold">Gastos por Centro de Custo</h2>
+              <p className="text-sm text-muted-foreground">Distribuição para contabilidade</p>
+            </div>
+            <Badge variant="secondary">contábil</Badge>
           </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary">referência</Badge>
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => fetchANPMutation.mutate()}
-              disabled={fetchANPMutation.isPending}
-            >
-              {fetchANPMutation.isPending ? 'Buscando...' : 'Buscar ANP'}
-            </Button>
+
+          {costCenterData.length > 0 ? (
+            <div className="space-y-4">
+              {/* Mini gráfico de pizza */}
+              <div className="h-[180px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={costCenterData}
+                      dataKey="value"
+                      nameKey="name"
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={70}
+                      innerRadius={40}
+                    >
+                      {costCenterData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value) => formatCurrency(Number(value))}
+                      contentStyle={{
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        border: '1px solid rgba(255,255,255,0.1)',
+                        borderRadius: '8px',
+                      }}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Lista detalhada */}
+              <div className="space-y-2">
+                {data.cost_by_cost_center.map((item, index) => {
+                  const percent = data.summary.total_cost > 0
+                    ? (item.total_cost / data.summary.total_cost) * 100
+                    : 0
+                  return (
+                    <div key={item.cost_center__id || 'none'} className="flex items-center justify-between py-2 border-b border-white/5 last:border-0">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                        />
+                        <span className="text-sm">{item.cost_center__name}</span>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-semibold">{formatCurrency(item.total_cost)}</p>
+                        <p className="text-xs text-muted-foreground">{formatNumber(percent, 1)}%</p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>Nenhum gasto registrado no período</p>
+            </div>
+          )}
+        </motion.div>
+
+        {/* Gastos por Veículo */}
+        <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold">Gastos por Veículo</h2>
+              <p className="text-sm text-muted-foreground">Ranking de consumo</p>
+            </div>
+            <Badge variant="secondary">{data.cost_by_vehicle.length} veículos</Badge>
           </div>
-        </div>
-        <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-          <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Média nacional por litro</p>
-            <div className="grid gap-3 sm:grid-cols-3">
-              {['GASOLINE', 'ETHANOL', 'DIESEL'].map((fuelType) => {
-                const price = nationalPrices.find((item) => item.fuel_type === fuelType)
+
+          {data.cost_by_vehicle.length > 0 ? (
+            <div className="space-y-3">
+              {data.cost_by_vehicle.slice(0, 6).map((vehicle, index) => {
+                const percent = data.summary.total_cost > 0
+                  ? (vehicle.total_cost / data.summary.total_cost) * 100
+                  : 0
+                const maxCost = data.cost_by_vehicle[0]?.total_cost || 1
+                const barWidth = (vehicle.total_cost / maxCost) * 100
+
                 return (
-                  <div key={fuelType} className="rounded-xl border border-white/10 bg-white/5 p-4">
-                    <p className="text-xs text-muted-foreground">{fuelTypeLabels[fuelType]}</p>
-                    <p className="text-lg font-semibold">
-                      {price?.price_per_liter !== null && price?.price_per_liter !== undefined
-                        ? formatCurrency(Number(price.price_per_liter))
-                        : '—'}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground">
-                      {price?.collected_at ? 'Atualizado' : 'Sem média'}
-                    </p>
+                  <div key={vehicle.vehicle__id} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <Car className="w-4 h-4 text-muted-foreground" />
+                        <span className="font-medium">{vehicle.vehicle__name}</span>
+                        <span className="text-muted-foreground">({vehicle.vehicle__plate})</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="font-semibold">{formatCurrency(vehicle.total_cost)}</span>
+                        <span className="text-muted-foreground text-xs ml-2">({formatNumber(percent, 0)}%)</span>
+                      </div>
+                    </div>
+                    <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${barWidth}%` }}
+                        transition={{ duration: 0.5, delay: index * 0.1 }}
+                        className="h-full rounded-full"
+                        style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>{formatNumber(vehicle.total_liters)} L</span>
+                      <span>{vehicle.transaction_count} abastec.</span>
+                      {vehicle.km_per_liter && <span>{formatNumber(vehicle.km_per_liter)} km/L</span>}
+                    </div>
                   </div>
                 )
               })}
             </div>
-            {hasNationalAvg ? (
-              <p className="text-xs text-muted-foreground">
-                Cobertura: {formatNumber(coveragePercent, 1)}% dos litros do período
-              </p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Cadastre um snapshot global (manual ou ANP) para exibir a média.
-              </p>
-            )}
-          </div>
-          <div className="space-y-2">
-            <p className="text-sm text-muted-foreground">Impacto no período</p>
-            {hasImpact ? (
-              <>
-                <p className={`text-2xl font-bold ${deltaColor}`}>
-                  {deltaValue > 0 ? '+' : ''}
-                  {formatCurrency(Math.abs(Number(deltaValue)))}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {deltaLabel} vs média ({formatNumber(deltaPercent, 1)}%)
-                </p>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Sem abastecimentos no período para calcular impacto.
-              </p>
-            )}
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Charts Row */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Monthly Trend Chart */}
-        <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-            <h3 className="text-lg font-semibold">Evolução Mensal</h3>
-            <p className="text-sm text-muted-foreground">Custo e consumo</p>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>Nenhum veículo com abastecimentos</p>
             </div>
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-blue-500" />
-                <span className="text-muted-foreground">Custo</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-sky-500" />
-                <span className="text-muted-foreground">Litros</span>
-              </div>
-            </div>
-          </div>
-          <div className="h-[300px]">
-            {monthlyData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={0}>
-                <AreaChart data={monthlyData}>
-                  <defs>
-                    <linearGradient id="colorCusto" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="colorLitros" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#38bdf8" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#38bdf8" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
-                  <XAxis
-                    dataKey="month"
-                    stroke="#64748b"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    stroke="#64748b"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => `R$${value / 1000}k`}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: '12px',
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-                    }}
-                    labelStyle={{ color: '#fff' }}
-                    formatter={(value, name) => [
-                      name === 'custo' ? formatCurrency(Number(value)) : `${formatNumber(Number(value))} L`,
-                      name === 'custo' ? 'Custo' : 'Litros'
-                    ]}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="custo"
-                    stroke="#3b82f6"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorCusto)"
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="litros"
-                    stroke="#38bdf8"
-                    strokeWidth={2}
-                    fillOpacity={1}
-                    fill="url(#colorLitros)"
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                <p>Nenhum dado no período</p>
-              </div>
-            )}
-          </div>
-        </motion.div>
-
-        {/* Vehicle Cost Chart */}
-        <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-            <h3 className="text-lg font-semibold">Top Consumidores</h3>
-            <p className="text-sm text-muted-foreground">Veículos com maior gasto</p>
-            </div>
-          </div>
-          <div className="h-[300px]">
-            {vehicleData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%" minHeight={300} minWidth={0}>
-                <BarChart data={vehicleData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" horizontal={false} />
-                  <XAxis
-                    type="number"
-                    stroke="#64748b"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                    tickFormatter={(value) => `R$${value / 1000}k`}
-                  />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    stroke="#64748b"
-                    fontSize={12}
-                    tickLine={false}
-                    axisLine={false}
-                    width={80}
-                  />
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: 'rgba(15, 23, 42, 0.9)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      borderRadius: '12px',
-                    }}
-                    formatter={(value) => [formatCurrency(Number(value)), 'Custo']}
-                  />
-                  <Bar dataKey="custo" radius={[0, 8, 8, 0]}>
-                    {vehicleData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex items-center justify-center h-full text-muted-foreground">
-                <p>Nenhum veículo com abastecimentos</p>
-              </div>
-            )}
-          </div>
+          )}
         </motion.div>
       </div>
 
-      {/* Vehicle Details Table */}
-      <motion.div variants={itemVariants} className="glass-card rounded-2xl overflow-hidden">
-        <div className="p-6 border-b border-white/10">
-          <h3 className="text-lg font-semibold">Eficiência por Veículo</h3>
-          <p className="text-sm text-muted-foreground">Custo, consumo e eficiência no período</p>
+      {/* Evolução Mensal */}
+      <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold">Evolução dos Gastos</h2>
+            <p className="text-sm text-muted-foreground">Últimos 6 meses</p>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-white/10">
-                <th className="px-6 py-4 text-left text-sm font-medium text-muted-foreground">Veículo</th>
-                <th className="px-6 py-4 text-right text-sm font-medium text-muted-foreground">Abastecimentos</th>
-                <th className="px-6 py-4 text-right text-sm font-medium text-muted-foreground">Custo Total</th>
-                <th className="px-6 py-4 text-right text-sm font-medium text-muted-foreground">Litros</th>
-                <th className="px-6 py-4 text-right text-sm font-medium text-muted-foreground">km/L</th>
-                <th className="px-6 py-4 text-right text-sm font-medium text-muted-foreground">R$/km</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.cost_by_vehicle.map((vehicle, index) => (
-                <motion.tr
-                  key={vehicle.vehicle__id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="border-b border-white/5 hover:bg-white/5 transition-colors"
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-lg flex items-center justify-center"
-                        style={{ backgroundColor: `${COLORS[index % COLORS.length]}20` }}
-                      >
-                        <Fuel className="w-5 h-5" style={{ color: COLORS[index % COLORS.length] }} />
-                      </div>
-                      <div>
-                        <p className="font-medium">{vehicle.vehicle__name}</p>
-                        <p className="text-sm text-muted-foreground">{vehicle.vehicle__plate}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right text-muted-foreground">
-                    {formatNumber(vehicle.transaction_count, 0)}
-                  </td>
-                  <td className="px-6 py-4 text-right font-semibold">
-                    {formatCurrency(vehicle.total_cost)}
-                  </td>
-                  <td className="px-6 py-4 text-right text-muted-foreground">
-                    {formatNumber(vehicle.total_liters)} L
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    {vehicle.km_per_liter ? (
-                      <span className="text-sky-400">{formatNumber(vehicle.km_per_liter)}</span>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    {vehicle.cost_per_km ? (
-                      <span className="text-blue-400">{formatCurrency(vehicle.cost_per_km)}</span>
-                    ) : (
-                      <span className="text-muted-foreground">-</span>
-                    )}
-                  </td>
-                </motion.tr>
-              ))}
-            </tbody>
-          </table>
+
+        <div className="h-[250px]">
+          {monthlyData.length > 0 ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={monthlyData}>
+                <defs>
+                  <linearGradient id="colorGasto" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" />
+                <XAxis
+                  dataKey="mes"
+                  stroke="#64748b"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                />
+                <YAxis
+                  stroke="#64748b"
+                  fontSize={12}
+                  tickLine={false}
+                  axisLine={false}
+                  tickFormatter={(value) => `R$${(value / 1000).toFixed(0)}k`}
+                />
+                <Tooltip
+                  contentStyle={{
+                    backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '8px',
+                  }}
+                  formatter={(value) => [formatCurrency(Number(value)), 'Gasto']}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="valor"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  fillOpacity={1}
+                  fill="url(#colorGasto)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              <p>Sem dados históricos</p>
+            </div>
+          )}
         </div>
       </motion.div>
 
-      {/* Alerts Section */}
-      {data.alerts.top_alerts.length > 0 && (
-        <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold">Alertas Recentes</h3>
-              <p className="text-sm text-muted-foreground">Verificações de consistência</p>
-            </div>
-            <Badge variant="destructive" className="animate-pulse">
-              {data.alerts.open_count} pendentes
-            </Badge>
+      {/* Resumo para Fechamento Contábil */}
+      <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6 border border-blue-500/20 bg-blue-500/5">
+        <div className="flex items-center gap-2 mb-4">
+          <Fuel className="w-5 h-5 text-blue-400" />
+          <h2 className="text-lg font-semibold">Resumo para Fechamento</h2>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <p className="text-sm text-muted-foreground">Período</p>
+            <p className="font-semibold">
+              {new Date(data.period.from).toLocaleDateString('pt-BR')} a {new Date(data.period.to).toLocaleDateString('pt-BR')}
+            </p>
           </div>
-          <div className="space-y-4">
-            {data.alerts.top_alerts.map((alert, index) => (
-              <motion.div
-                key={alert.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.1 }}
-                className="flex items-start gap-4 p-4 rounded-xl bg-red-500/10 border border-red-500/20"
-              >
-                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-red-500/20">
-                  <AlertTriangle className="w-5 h-5 text-red-400" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium">{alert.vehicle__name}</span>
-                    <Badge
-                      variant={alert.severity === 'CRITICAL' ? 'destructive' : 'warning'}
-                      className="text-xs"
-                    >
-                      {alert.severity}
-                    </Badge>
-                  </div>
-                  <p className="text-sm text-muted-foreground">{alert.message}</p>
-                </div>
-                <ArrowUpRight className="w-5 h-5 text-muted-foreground" />
-              </motion.div>
-            ))}
+          <div>
+            <p className="text-sm text-muted-foreground">Total Combustível</p>
+            <p className="font-semibold text-xl">{formatCurrency(data.summary.total_cost)}</p>
           </div>
-        </motion.div>
-      )}
+          <div>
+            <p className="text-sm text-muted-foreground">Volume Total</p>
+            <p className="font-semibold">{formatNumber(data.summary.total_liters)} litros</p>
+          </div>
+          <div>
+            <p className="text-sm text-muted-foreground">Qtd. Abastecimentos</p>
+            <p className="font-semibold">{data.summary.transaction_count}</p>
+          </div>
+        </div>
+      </motion.div>
     </motion.div>
   )
 }
 
-interface StatCardProps {
+interface SummaryCardProps {
   title: string
   value: string
   subtitle: string
   icon: React.ElementType
-  color: 'blue' | 'sky' | 'emerald' | 'red'
-  alert?: boolean
-  tag?: string
-  tagTone?: 'default' | 'success' | 'warning' | 'danger'
+  highlight?: boolean
+  trend?: 'up' | 'down' | 'neutral'
 }
 
-function StatCard({ title, value, subtitle, icon: Icon, color, alert, tag, tagTone = 'default' }: StatCardProps) {
-  const iconBgClasses = {
-    blue: 'from-blue-500 to-blue-600',
-    sky: 'from-sky-500 to-sky-600',
-    emerald: 'from-emerald-500 to-emerald-600',
-    red: 'from-red-500 to-red-600',
-  }
-
-  const tagClasses = {
-    default: 'border-white/10 bg-white/5 text-muted-foreground',
-    success: 'border-emerald-500/30 bg-emerald-500/15 text-emerald-200',
-    warning: 'border-amber-500/30 bg-amber-500/15 text-amber-200',
-    danger: 'border-red-500/30 bg-red-500/15 text-red-200',
+function SummaryCard({ title, value, subtitle, icon: Icon, highlight, trend }: SummaryCardProps) {
+  const trendColors = {
+    up: 'text-red-400',
+    down: 'text-emerald-400',
+    neutral: 'text-muted-foreground',
   }
 
   return (
     <motion.div
       variants={itemVariants}
-      whileHover={{ scale: 1.02, y: -5 }}
-      className={`glass-card rounded-2xl p-6 transition-all duration-300 ${alert ? 'pulse-glow' : ''}`}
+      className={`glass-card rounded-xl p-4 ${highlight ? 'border border-blue-500/30 bg-blue-500/5' : ''}`}
     >
       <div className="flex items-start justify-between">
-        <div
-          className={`flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br ${iconBgClasses[color]} shadow-lg`}
-        >
-          <Icon className="w-6 h-6 text-white" />
+        <div className={`p-2 rounded-lg ${highlight ? 'bg-blue-500/20' : 'bg-white/5'}`}>
+          <Icon className={`w-5 h-5 ${highlight ? 'text-blue-400' : 'text-muted-foreground'} ${trend ? trendColors[trend] : ''}`} />
         </div>
-        {tag && (
-          <span className={`rounded-full border px-3 py-1 text-xs ${tagClasses[tagTone]}`}>
-            {tag}
-          </span>
-        )}
       </div>
-      <div className="mt-4">
+      <div className="mt-3">
         <p className="text-sm text-muted-foreground">{title}</p>
-        <p className="text-2xl font-bold mt-1">{value}</p>
-        <p className="text-sm text-muted-foreground mt-1">{subtitle}</p>
+        <p className={`text-2xl font-bold mt-1 ${trend ? trendColors[trend] : ''}`}>{value}</p>
+        <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
       </div>
     </motion.div>
   )
 }
 
-interface InsightCardProps {
-  title: string
-  value: string
-  subtitle: string
-  valueClassName?: string
-}
-
-function InsightCard({ title, value, subtitle, valueClassName }: InsightCardProps) {
-  return (
-    <div className="rounded-xl border border-white/10 bg-white/5 p-4">
-      <p className="text-xs text-muted-foreground">{title}</p>
-      <p className={`mt-2 text-lg font-semibold ${valueClassName ?? ''}`}>{value}</p>
-      <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
-    </div>
-  )
-}
-
 function DashboardSkeleton() {
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div>
-        <div className="h-9 w-48 bg-white/5 rounded-lg animate-pulse" />
+        <div className="h-8 w-48 bg-white/5 rounded-lg animate-pulse" />
         <div className="h-5 w-64 bg-white/5 rounded-lg animate-pulse mt-2" />
       </div>
-      <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="glass-card rounded-2xl p-6 h-40 shimmer" />
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="glass-card rounded-xl p-4 h-32 animate-pulse bg-white/5" />
         ))}
       </div>
-      <div className="glass-card rounded-2xl p-6 h-44 shimmer" />
       <div className="grid gap-6 lg:grid-cols-2">
-        <div className="glass-card rounded-2xl p-6 h-96 shimmer" />
-        <div className="glass-card rounded-2xl p-6 h-96 shimmer" />
+        <div className="glass-card rounded-2xl p-6 h-80 animate-pulse bg-white/5" />
+        <div className="glass-card rounded-2xl p-6 h-80 animate-pulse bg-white/5" />
       </div>
     </div>
   )
