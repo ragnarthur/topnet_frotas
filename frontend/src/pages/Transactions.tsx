@@ -217,7 +217,7 @@ export function TransactionsPage() {
       if (price) {
         setForm((prev) => ({
           ...prev,
-          unit_price: formatCurrencyInput(price.price_per_liter, 4)
+          unit_price: formatCurrencyInput(price.price_per_liter, 2)
         }))
       }
     } catch {
@@ -598,7 +598,7 @@ export function TransactionsPage() {
                       value={form.unit_price}
                       onChange={(e) => setForm((prev) => ({
                         ...prev,
-                        unit_price: maskCurrencyInput(e.target.value, 4)
+                        unit_price: maskCurrencyInput(e.target.value, 2)
                       }))}
                       placeholder="R$ 0,0000"
                       required
@@ -842,7 +842,7 @@ function EditTransactionForm({
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditForm({
         liters: formatCurrencyInput(transaction.liters, 3),
-        unit_price: formatCurrencyInput(transaction.unit_price, 4),
+        unit_price: formatCurrencyInput(transaction.unit_price, 2),
         odometer_km: String(transaction.odometer_km),
         notes: transaction.notes || '',
       })
@@ -902,7 +902,7 @@ function EditTransactionForm({
             value={editForm.unit_price}
             onChange={(e) => setEditForm((prev) => ({
               ...prev,
-              unit_price: maskCurrencyInput(e.target.value, 4)
+              unit_price: maskCurrencyInput(e.target.value, 2)
             }))}
             placeholder="R$ 0,0000"
           />

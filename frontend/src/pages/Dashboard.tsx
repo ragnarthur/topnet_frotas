@@ -194,7 +194,7 @@ export function DashboardPage() {
                   </div>
                   <p className="text-2xl font-bold">
                     {price.price_per_liter
-                      ? `R$ ${formatNumber(price.price_per_liter, 3)}`
+                      ? `R$ ${formatNumber(price.price_per_liter, 2)}`
                       : '—'
                     }
                   </p>
