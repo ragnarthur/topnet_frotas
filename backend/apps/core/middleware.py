@@ -40,8 +40,10 @@ class WAFMiddleware:
         r";\s*--",
         r"--\s*$",
         r"/\*.*\*/",
-        r"or\s+1\s*=\s*1",
-        r"and\s+1\s*=\s*1",
+        r"or\s+['\"]?1['\"]?\s*=\s*['\"]?1['\"]?",
+        r"and\s+['\"]?1['\"]?\s*=\s*['\"]?1['\"]?",
+        r"pg_sleep\s*\\(",
+        r"sleep\s*\\(",
     ]
 
     # XSS patterns
