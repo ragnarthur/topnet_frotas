@@ -6,6 +6,7 @@ Provides protection against common web attacks:
 - Cross-Site Scripting (XSS)
 - Path Traversal
 """
+import json
 import logging
 import re
 from urllib.parse import unquote
@@ -37,8 +38,10 @@ class WAFMiddleware:
         r"(?i)(update\s+.+\s+set\s+)",
         r"(';\s*--|--\s*$)",
         r"(/\*.*\*/)",
-        r"(?i)(or\s+1\s*=\s*1)",
-        r"(?i)(and\s+1\s*=\s*1)",
+        r"(?i)(or\s+['\"]?1['\"]?\s*=\s*['\"]?1['\"]?)",
+        r"(?i)(and\s+['\"]?1['\"]?\s*=\s*['\"]?1['\"]?)",
+        r"(?i)(pg_sleep\s*\\()",
+        r"(?i)(sleep\s*\\()",
     ]
 
     # XSS patterns
@@ -99,6 +102,11 @@ class WAFMiddleware:
                 if isinstance(value, str) and self._is_malicious(value, request, key):
                     return self._block_request(request, 'post_data', f"{key}={value[:50]}")
 
+        # Check JSON payloads
+        if request.method in ['POST', 'PUT', 'PATCH'] and 'application/json' in request.content_type:
+            if self._check_json_body(request):
+                return self._block_request(request, 'json_body', 'payload')
+
         return self.get_response(request)
 
     def _is_malicious(self, value: str, request, param_name: str) -> bool:
@@ -107,7 +115,12 @@ class WAFMiddleware:
             return False
 
         # Decode URL encoding for thorough check
-        decoded_value = unquote(value)
+        decoded_value = value
+        for _ in range(2):
+            next_value = unquote(decoded_value)
+            if next_value == decoded_value:
+                break
+            decoded_value = next_value
 
         # Check SQL injection
         for pattern in self.sql_patterns:
@@ -141,6 +154,36 @@ class WAFMiddleware:
                 return True
 
         return False
+
+    def _check_json_body(self, request) -> bool:
+        try:
+            raw_body = request.body
+        except Exception:
+            return False
+
+        if not raw_body:
+            return False
+
+        try:
+            payload = json.loads(raw_body.decode('utf-8'))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return False
+
+        for value in self._iter_json_strings(payload):
+            if self._is_malicious(value, request, 'json'):
+                return True
+
+        return False
+
+    def _iter_json_strings(self, payload):
+        if isinstance(payload, dict):
+            for value in payload.values():
+                yield from self._iter_json_strings(value)
+        elif isinstance(payload, list):
+            for value in payload:
+                yield from self._iter_json_strings(value)
+        elif isinstance(payload, str):
+            yield payload
 
     def _block_request(self, request, attack_type: str, details: str):
         """Block malicious request and return error response."""
