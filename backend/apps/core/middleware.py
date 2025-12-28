@@ -28,34 +28,35 @@ class WAFMiddleware:
 
     # SQL Injection patterns
     SQL_PATTERNS = [
-        r"(?i)(union\s+(all\s+)?select)",
-        r"(?i)(select\s+.+\s+from\s+)",
-        r"(?i)(insert\s+into\s+)",
-        r"(?i)(delete\s+from\s+)",
-        r"(?i)(drop\s+(table|database|index))",
-        r"(?i)(alter\s+table)",
-        r"(?i)(exec\s*\(|execute\s+)",
-        r"(?i)(update\s+.+\s+set\s+)",
-        r"(';\s*--|--\s*$)",
-        r"(/\*.*\*/)",
-        r"(?i)(or\s+['\"]?1['\"]?\s*=\s*['\"]?1['\"]?)",
-        r"(?i)(and\s+['\"]?1['\"]?\s*=\s*['\"]?1['\"]?)",
-        r"(?i)(pg_sleep\s*\\()",
-        r"(?i)(sleep\s*\\()",
+        r"union\s+select",
+        r"union\s+all\s+select",
+        r"select\s+.+\s+from",
+        r"insert\s+into",
+        r"delete\s+from",
+        r"drop\s+table",
+        r"drop\s+database",
+        r"alter\s+table",
+        r"update\s+.+\s+set",
+        r";\s*--",
+        r"--\s*$",
+        r"/\*.*\*/",
+        r"or\s+1\s*=\s*1",
+        r"and\s+1\s*=\s*1",
     ]
 
     # XSS patterns
     XSS_PATTERNS = [
-        r"(?i)<script[^>]*>",
-        r"(?i)</script>",
-        r"(?i)javascript\s*:",
-        r"(?i)on(load|error|click|mouse|focus|blur|change|submit)\s*=",
-        r"(?i)<iframe[^>]*>",
-        r"(?i)<object[^>]*>",
-        r"(?i)<embed[^>]*>",
-        r"(?i)<svg[^>]*onload",
-        r"(?i)expression\s*\(",
-        r"(?i)vbscript\s*:",
+        r"<script",
+        r"</script>",
+        r"javascript:",
+        r"onload\s*=",
+        r"onerror\s*=",
+        r"onclick\s*=",
+        r"onmouseover\s*=",
+        r"<iframe",
+        r"<object",
+        r"<embed",
+        r"vbscript:",
     ]
 
     # Path traversal patterns
@@ -78,8 +79,8 @@ class WAFMiddleware:
 
     def __init__(self, get_response):
         self.get_response = get_response
-        self.sql_patterns = [re.compile(p) for p in self.SQL_PATTERNS]
-        self.xss_patterns = [re.compile(p) for p in self.XSS_PATTERNS]
+        self.sql_patterns = [re.compile(p, re.IGNORECASE) for p in self.SQL_PATTERNS]
+        self.xss_patterns = [re.compile(p, re.IGNORECASE) for p in self.XSS_PATTERNS]
         self.path_patterns = [re.compile(p, re.IGNORECASE) for p in self.PATH_PATTERNS]
 
     def __call__(self, request):
