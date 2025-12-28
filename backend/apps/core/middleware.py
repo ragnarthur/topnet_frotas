@@ -42,8 +42,8 @@ class WAFMiddleware:
         r"/\*.*\*/",
         r"or\s+['\"]?1['\"]?\s*=\s*['\"]?1['\"]?",
         r"and\s+['\"]?1['\"]?\s*=\s*['\"]?1['\"]?",
-        r"pg_sleep\s*\\(",
-        r"sleep\s*\\(",
+        r"pg_sleep\s*\(",
+        r"sleep\s*\(",
     ]
 
     # XSS patterns
