@@ -21,6 +21,8 @@ import {
   Banknote,
   Droplets,
   Car,
+  RefreshCw,
+  ExternalLink,
 } from 'lucide-react'
 import { dashboard } from '@/api/client'
 import { formatCurrency, formatNumber } from '@/lib/utils'
@@ -143,6 +145,129 @@ export function DashboardPage() {
           trend={variacaoMensal !== null ? (variacaoMensal > 0 ? 'up' : variacaoMensal < 0 ? 'down' : 'neutral') : 'neutral'}
         />
       </motion.div>
+
+      {/* Seção ANP - Preços de Referência */}
+      {data.price_reference && (
+        <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6 border border-emerald-500/20 bg-emerald-500/5">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Fuel className="w-5 h-5 text-emerald-400" />
+              <div>
+                <h2 className="text-lg font-semibold">Preços de Referência ANP</h2>
+                <p className="text-sm text-muted-foreground">Médias nacionais atualizadas</p>
+              </div>
+            </div>
+            <a
+              href="https://www.gov.br/anp/pt-br"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-xs text-emerald-400 hover:text-emerald-300 transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" />
+              ANP
+            </a>
+          </div>
+
+          {/* Grid de preços por tipo de combustível */}
+          <div className="grid gap-4 sm:grid-cols-3 mb-6">
+            {data.price_reference.national_avg_prices.map((price) => {
+              const fuelLabels: Record<string, { label: string; color: string; bgColor: string }> = {
+                GASOLINE: { label: 'Gasolina', color: 'text-orange-400', bgColor: 'bg-orange-500/20' },
+                ETHANOL: { label: 'Etanol', color: 'text-green-400', bgColor: 'bg-green-500/20' },
+                DIESEL: { label: 'Diesel', color: 'text-gray-400', bgColor: 'bg-gray-500/20' },
+              }
+              const config = fuelLabels[price.fuel_type] || { label: price.fuel_type, color: 'text-blue-400', bgColor: 'bg-blue-500/20' }
+
+              return (
+                <div
+                  key={price.fuel_type}
+                  className={`rounded-xl p-4 ${config.bgColor} border border-white/5`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`text-sm font-medium ${config.color}`}>{config.label}</span>
+                    {price.collected_at && (
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <RefreshCw className="w-3 h-3" />
+                        {new Date(price.collected_at).toLocaleDateString('pt-BR')}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-2xl font-bold">
+                    {price.price_per_liter
+                      ? `R$ ${formatNumber(price.price_per_liter, 3)}`
+                      : '—'
+                    }
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">por litro</p>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Comparativo de custos */}
+          {data.price_reference.expected_cost !== null && data.price_reference.actual_cost !== null && (
+            <div className="border-t border-white/10 pt-4">
+              <div className="grid gap-4 sm:grid-cols-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Custo Esperado (ANP)</p>
+                  <p className="text-lg font-semibold text-emerald-400">
+                    {formatCurrency(data.price_reference.expected_cost)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {formatNumber(data.price_reference.coverage_liters)} L cobertos ({formatNumber(data.price_reference.coverage_ratio * 100, 0)}%)
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Custo Real</p>
+                  <p className="text-lg font-semibold">
+                    {formatCurrency(data.price_reference.actual_cost)}
+                  </p>
+                  <p className="text-xs text-muted-foreground">valor pago</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Diferença</p>
+                  <p className={`text-lg font-semibold ${
+                    data.price_reference.delta && data.price_reference.delta > 0
+                      ? 'text-red-400'
+                      : data.price_reference.delta && data.price_reference.delta < 0
+                        ? 'text-emerald-400'
+                        : ''
+                  }`}>
+                    {data.price_reference.delta !== null
+                      ? `${data.price_reference.delta > 0 ? '+' : ''}${formatCurrency(data.price_reference.delta)}`
+                      : '—'
+                    }
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {data.price_reference.delta && data.price_reference.delta > 0
+                      ? 'acima da média'
+                      : data.price_reference.delta && data.price_reference.delta < 0
+                        ? 'abaixo da média'
+                        : 'na média'
+                    }
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Variação %</p>
+                  <p className={`text-lg font-semibold ${
+                    data.price_reference.delta_percent && data.price_reference.delta_percent > 0
+                      ? 'text-red-400'
+                      : data.price_reference.delta_percent && data.price_reference.delta_percent < 0
+                        ? 'text-emerald-400'
+                        : ''
+                  }`}>
+                    {data.price_reference.delta_percent !== null
+                      ? `${data.price_reference.delta_percent > 0 ? '+' : ''}${formatNumber(data.price_reference.delta_percent, 1)}%`
+                      : '—'
+                    }
+                  </p>
+                  <p className="text-xs text-muted-foreground">vs média nacional</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </motion.div>
+      )}
 
       {/* Alertas (se houver) */}
       {data.alerts.open_count > 0 && (
