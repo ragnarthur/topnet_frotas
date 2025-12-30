@@ -1,5 +1,7 @@
 from django.utils import timezone
 from django_filters import rest_framework as filters
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes, inline_serializer
+from rest_framework import serializers as drf_serializers
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -30,7 +32,28 @@ class AlertFilter(filters.FilterSet):
         fields = ['vehicle', 'type', 'severity']
 
 
+@extend_schema_view(
+    list=extend_schema(
+        tags=['alerts'],
+        summary='Listar alertas',
+        description='Retorna lista de alertas com filtros opcionais.',
+        parameters=[
+            OpenApiParameter('from_date', OpenApiTypes.DATE, description='Data inicial'),
+            OpenApiParameter('to_date', OpenApiTypes.DATE, description='Data final'),
+            OpenApiParameter('vehicle', OpenApiTypes.UUID, description='ID do veículo'),
+            OpenApiParameter('type', OpenApiTypes.STR, description='Tipo (ODOMETER_REGRESSION, LITERS_OVER_TANK, OUTLIER_CONSUMPTION, PERSONAL_USAGE)'),
+            OpenApiParameter('severity', OpenApiTypes.STR, description='Severidade (INFO, WARN, CRITICAL)'),
+            OpenApiParameter('resolved', OpenApiTypes.BOOL, description='Filtrar por status de resolução'),
+        ],
+    ),
+    retrieve=extend_schema(tags=['alerts'], summary='Detalhes do alerta', description='Retorna detalhes de um alerta.'),
+    create=extend_schema(tags=['alerts'], summary='Criar alerta', description='Cria um novo alerta manualmente.'),
+    update=extend_schema(tags=['alerts'], summary='Atualizar alerta', description='Atualiza um alerta.'),
+    partial_update=extend_schema(tags=['alerts'], summary='Atualizar parcialmente', description='Atualiza parcialmente um alerta.'),
+    destroy=extend_schema(tags=['alerts'], summary='Excluir alerta', description='Remove um alerta.'),
+)
 class AlertViewSet(AuditMixin, viewsets.ModelViewSet):
+    """ViewSet para gerenciamento de alertas de inconsistência."""
     queryset = Alert.objects.select_related('vehicle', 'fuel_transaction').all()
     permission_classes = [IsAdminUser]
     filterset_class = AlertFilter
@@ -43,6 +66,13 @@ class AlertViewSet(AuditMixin, viewsets.ModelViewSet):
             return AlertListSerializer
         return AlertSerializer
 
+    @extend_schema(
+        tags=['alerts'],
+        summary='Resolver alerta',
+        description='Marca um alerta como resolvido.',
+        request=None,
+        responses={200: AlertSerializer},
+    )
     @action(detail=True, methods=['post'])
     def resolve(self, request, pk=None):
         """Mark an alert as resolved."""
@@ -61,6 +91,24 @@ class AlertViewSet(AuditMixin, viewsets.ModelViewSet):
         serializer = AlertSerializer(alert)
         return Response(serializer.data)
 
+    @extend_schema(
+        tags=['alerts'],
+        summary='Resolver alertas em lote',
+        description='Resolve múltiplos alertas de uma vez.',
+        request=inline_serializer(
+            name='BulkResolveRequest',
+            fields={'ids': drf_serializers.ListField(child=drf_serializers.UUIDField())}
+        ),
+        responses={
+            200: inline_serializer(
+                name='BulkResolveResponse',
+                fields={
+                    'message': drf_serializers.CharField(),
+                    'count': drf_serializers.IntegerField(),
+                }
+            ),
+        }
+    )
     @action(detail=False, methods=['post'])
     def resolve_bulk(self, request):
         """Resolve multiple alerts at once."""
@@ -87,6 +135,11 @@ class AlertViewSet(AuditMixin, viewsets.ModelViewSet):
             'count': updated
         })
 
+    @extend_schema(
+        tags=['alerts'],
+        summary='Alertas abertos',
+        description='Retorna apenas alertas não resolvidos.',
+    )
     @action(detail=False, methods=['get'])
     def open(self, request):
         """Get all open (unresolved) alerts."""

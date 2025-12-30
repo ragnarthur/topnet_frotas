@@ -1,4 +1,6 @@
 from django.conf import settings
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers as drf_serializers
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -15,11 +17,31 @@ class LoginRateThrottle(AnonRateThrottle):
     rate = '5/minute'
 
 
+@extend_schema(
+    tags=['auth'],
+    summary='Obter tokens JWT',
+    description='Autentica usuário e retorna tokens de acesso e refresh.',
+    responses={
+        200: inline_serializer(
+            name='TokenObtainResponse',
+            fields={
+                'access': drf_serializers.CharField(help_text='Token de acesso JWT'),
+                'refresh': drf_serializers.CharField(help_text='Token de refresh JWT'),
+            }
+        ),
+        401: inline_serializer(name='AuthErrorResponse', fields={'detail': drf_serializers.CharField()}),
+    }
+)
 class ThrottledTokenObtainPairView(TokenObtainPairView):
     """Token obtain view with rate limiting."""
     throttle_classes = [LoginRateThrottle]
 
 
+@extend_schema(
+    tags=['auth'],
+    summary='Renovar token de acesso',
+    description='Renova o token de acesso usando o token de refresh.',
+)
 class ThrottledTokenRefreshView(TokenRefreshView):
     """Token refresh view with rate limiting."""
     throttle_classes = [LoginRateThrottle]
@@ -88,6 +110,13 @@ class LogoutView(APIView):
     """Clear refresh token cookie."""
     permission_classes = [AllowAny]
 
+    @extend_schema(
+        tags=['auth'],
+        summary='Logout',
+        description='Limpa o cookie de refresh token.',
+        request=None,
+        responses={204: None},
+    )
     def post(self, request):
         response = Response(status=status.HTTP_204_NO_CONTENT)
         _clear_refresh_cookie(response)
@@ -98,6 +127,27 @@ class UserProfileView(APIView):
     """Get current user profile including role and permissions."""
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        tags=['auth'],
+        summary='Perfil do usuário',
+        description='Retorna dados do usuário autenticado, incluindo role e informações de motorista se aplicável.',
+        responses={
+            200: inline_serializer(
+                name='UserProfileResponse',
+                fields={
+                    'id': drf_serializers.IntegerField(),
+                    'username': drf_serializers.CharField(),
+                    'email': drf_serializers.EmailField(),
+                    'first_name': drf_serializers.CharField(),
+                    'last_name': drf_serializers.CharField(),
+                    'role': drf_serializers.CharField(help_text='admin ou driver'),
+                    'is_admin': drf_serializers.BooleanField(),
+                    'is_driver': drf_serializers.BooleanField(),
+                    'driver': drf_serializers.DictField(allow_null=True, help_text='Dados do motorista (se aplicável)'),
+                }
+            ),
+        }
+    )
     def get(self, request):
         user = request.user
         role = get_user_role(user)

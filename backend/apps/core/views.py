@@ -4,6 +4,7 @@ import redis
 from django.conf import settings
 from django.http import HttpResponseForbidden, HttpResponseServerError, StreamingHttpResponse
 from django_filters import rest_framework as filters
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiTypes
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
@@ -51,7 +52,16 @@ class VehicleFilter(filters.FilterSet):
         fields = ['fuel_type', 'usage_category', 'active']
 
 
+@extend_schema_view(
+    list=extend_schema(tags=['vehicles'], summary='Listar veículos', description='Retorna lista de veículos. Motoristas veem apenas seu veículo atual.'),
+    create=extend_schema(tags=['vehicles'], summary='Cadastrar veículo', description='Cadastra novo veículo. Apenas administradores.'),
+    retrieve=extend_schema(tags=['vehicles'], summary='Detalhes do veículo', description='Retorna detalhes de um veículo.'),
+    update=extend_schema(tags=['vehicles'], summary='Atualizar veículo', description='Atualiza um veículo. Apenas administradores.'),
+    partial_update=extend_schema(tags=['vehicles'], summary='Atualizar parcialmente', description='Atualiza parcialmente um veículo. Apenas administradores.'),
+    destroy=extend_schema(tags=['vehicles'], summary='Excluir veículo', description='Remove um veículo. Apenas administradores.'),
+)
 class VehicleViewSet(AuditMixin, viewsets.ModelViewSet):
+    """ViewSet para gerenciamento de veículos da frota."""
     queryset = Vehicle.objects.all()
     serializer_class = VehicleSerializer
     permission_classes = [IsAdminOrDriver]
@@ -93,6 +103,7 @@ class VehicleViewSet(AuditMixin, viewsets.ModelViewSet):
 
         return queryset.none()
 
+    @extend_schema(tags=['vehicles'], summary='Veículos ativos', description='Retorna apenas veículos ativos (para dropdowns).')
     @action(detail=False, methods=['get'])
     def active(self, request):
         """Return only active vehicles (for dropdowns)."""
@@ -109,7 +120,16 @@ class DriverFilter(filters.FilterSet):
         fields = ['active']
 
 
+@extend_schema_view(
+    list=extend_schema(tags=['drivers'], summary='Listar motoristas', description='Retorna lista de motoristas cadastrados.'),
+    create=extend_schema(tags=['drivers'], summary='Cadastrar motorista', description='Cadastra novo motorista.'),
+    retrieve=extend_schema(tags=['drivers'], summary='Detalhes do motorista', description='Retorna detalhes de um motorista.'),
+    update=extend_schema(tags=['drivers'], summary='Atualizar motorista', description='Atualiza dados de um motorista.'),
+    partial_update=extend_schema(tags=['drivers'], summary='Atualizar parcialmente', description='Atualiza parcialmente um motorista.'),
+    destroy=extend_schema(tags=['drivers'], summary='Excluir motorista', description='Remove um motorista.'),
+)
 class DriverViewSet(AuditMixin, viewsets.ModelViewSet):
+    """ViewSet para gerenciamento de motoristas."""
     queryset = Driver.objects.all()
     serializer_class = DriverSerializer
     permission_classes = [IsAdminUser]
@@ -123,6 +143,7 @@ class DriverViewSet(AuditMixin, viewsets.ModelViewSet):
             return DriverListSerializer
         return DriverSerializer
 
+    @extend_schema(tags=['drivers'], summary='Motoristas ativos', description='Retorna apenas motoristas ativos (para dropdowns).')
     @action(detail=False, methods=['get'])
     def active(self, request):
         """Return only active drivers (for dropdowns)."""
@@ -140,7 +161,16 @@ class CostCenterFilter(filters.FilterSet):
         fields = ['category', 'active']
 
 
+@extend_schema_view(
+    list=extend_schema(tags=['cost-centers'], summary='Listar centros de custo', description='Retorna lista de centros de custo.'),
+    create=extend_schema(tags=['cost-centers'], summary='Cadastrar centro de custo', description='Cadastra novo centro de custo.'),
+    retrieve=extend_schema(tags=['cost-centers'], summary='Detalhes do centro de custo', description='Retorna detalhes de um centro de custo.'),
+    update=extend_schema(tags=['cost-centers'], summary='Atualizar centro de custo', description='Atualiza um centro de custo.'),
+    partial_update=extend_schema(tags=['cost-centers'], summary='Atualizar parcialmente', description='Atualiza parcialmente um centro de custo.'),
+    destroy=extend_schema(tags=['cost-centers'], summary='Excluir centro de custo', description='Remove um centro de custo.'),
+)
 class CostCenterViewSet(AuditMixin, viewsets.ModelViewSet):
+    """ViewSet para gerenciamento de centros de custo."""
     queryset = CostCenter.objects.all()
     serializer_class = CostCenterSerializer
     permission_classes = [IsAdminUser]
@@ -154,6 +184,7 @@ class CostCenterViewSet(AuditMixin, viewsets.ModelViewSet):
             return CostCenterListSerializer
         return CostCenterSerializer
 
+    @extend_schema(tags=['cost-centers'], summary='Centros de custo ativos', description='Retorna apenas centros de custo ativos (para dropdowns).')
     @action(detail=False, methods=['get'])
     def active(self, request):
         """Return only active cost centers (for dropdowns)."""
@@ -171,7 +202,16 @@ class FuelStationFilter(filters.FilterSet):
         fields = ['city', 'active']
 
 
+@extend_schema_view(
+    list=extend_schema(tags=['fuel-stations'], summary='Listar postos', description='Retorna lista de postos de combustível.'),
+    create=extend_schema(tags=['fuel-stations'], summary='Cadastrar posto', description='Cadastra novo posto de combustível.'),
+    retrieve=extend_schema(tags=['fuel-stations'], summary='Detalhes do posto', description='Retorna detalhes de um posto.'),
+    update=extend_schema(tags=['fuel-stations'], summary='Atualizar posto', description='Atualiza um posto.'),
+    partial_update=extend_schema(tags=['fuel-stations'], summary='Atualizar parcialmente', description='Atualiza parcialmente um posto.'),
+    destroy=extend_schema(tags=['fuel-stations'], summary='Excluir posto', description='Remove um posto.'),
+)
 class FuelStationViewSet(AuditMixin, viewsets.ModelViewSet):
+    """ViewSet para gerenciamento de postos de combustível."""
     queryset = FuelStation.objects.all()
     serializer_class = FuelStationSerializer
     permission_classes = [IsAdminUser]
@@ -185,6 +225,7 @@ class FuelStationViewSet(AuditMixin, viewsets.ModelViewSet):
             return FuelStationListSerializer
         return FuelStationSerializer
 
+    @extend_schema(tags=['fuel-stations'], summary='Postos ativos', description='Retorna apenas postos ativos (para dropdowns).')
     @action(detail=False, methods=['get'])
     def active(self, request):
         """Return only active fuel stations (for dropdowns)."""
@@ -193,7 +234,24 @@ class FuelStationViewSet(AuditMixin, viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+@extend_schema_view(
+    list=extend_schema(
+        tags=['audit'],
+        summary='Listar logs de auditoria',
+        description='Retorna histórico de alterações no sistema.',
+        parameters=[
+            OpenApiParameter('from_date', OpenApiTypes.DATE, description='Data inicial'),
+            OpenApiParameter('to_date', OpenApiTypes.DATE, description='Data final'),
+            OpenApiParameter('action', OpenApiTypes.STR, description='Tipo de ação (CREATE, UPDATE, DELETE)'),
+            OpenApiParameter('entity_type', OpenApiTypes.STR, description='Tipo de entidade'),
+            OpenApiParameter('entity_id', OpenApiTypes.STR, description='ID da entidade'),
+            OpenApiParameter('username', OpenApiTypes.STR, description='Nome do usuário'),
+        ],
+    ),
+    retrieve=extend_schema(tags=['audit'], summary='Detalhes do log', description='Retorna detalhes de um registro de auditoria.'),
+)
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet para consulta de logs de auditoria."""
     queryset = AuditLog.objects.select_related('user').all()
     serializer_class = AuditLogSerializer
     permission_classes = [IsAdminUser]

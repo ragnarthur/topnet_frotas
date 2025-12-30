@@ -7,6 +7,11 @@ from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
 from django.utils import timezone
+from drf_spectacular.views import (
+    SpectacularAPIView,
+    SpectacularRedocView,
+    SpectacularSwaggerView,
+)
 
 
 def health_check(request):
@@ -19,6 +24,10 @@ def health_check(request):
 urlpatterns = [
     path('', health_check),
     path('admin/', admin.site.urls),
+    # API Documentation
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+    path('api/redoc/', SpectacularRedocView.as_view(url_name='schema'), name='redoc'),
     # API endpoints
     path('api/auth/', include('apps.users.urls')),
     path('api/', include('apps.core.urls')),

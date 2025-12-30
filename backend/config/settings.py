@@ -57,6 +57,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_filters',
     'django_celery_beat',
+    'drf_spectacular',
+    'drf_spectacular_sidecar',
     # Local apps
     'apps.core',
     'apps.fuel.apps.FuelConfig',
@@ -157,6 +159,55 @@ REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,
     'COERCE_DECIMAL_TO_STRING': False,
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+}
+
+# DRF Spectacular - API Documentation
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'FleetFuel API',
+    'DESCRIPTION': '''
+## API de Controle de Frota e Combustível
+
+Sistema para gerenciamento de abastecimentos, veículos, motoristas e controle de custos operacionais.
+
+### Funcionalidades principais:
+- **Autenticação JWT** - Login com tokens de acesso e refresh
+- **Gestão de Veículos** - Cadastro e acompanhamento de frota
+- **Abastecimentos** - Registro com validação automática
+- **Alertas** - Detecção de inconsistências (odômetro, consumo anômalo)
+- **Dashboard** - Métricas de custo, consumo e tendências
+- **Importação/Exportação** - Suporte a CSV
+
+### Autenticação
+Use o endpoint `/api/auth/token/` para obter tokens JWT.
+Inclua o header `Authorization: Bearer <access_token>` em todas as requisições.
+    ''',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SCHEMA_PATH_PREFIX': r'/api/',
+    'TAGS': [
+        {'name': 'auth', 'description': 'Autenticação e gerenciamento de usuários'},
+        {'name': 'vehicles', 'description': 'Gerenciamento de veículos da frota'},
+        {'name': 'drivers', 'description': 'Gerenciamento de motoristas'},
+        {'name': 'cost-centers', 'description': 'Centros de custo'},
+        {'name': 'fuel-stations', 'description': 'Postos de combustível'},
+        {'name': 'fuel-transactions', 'description': 'Abastecimentos'},
+        {'name': 'fuel-prices', 'description': 'Preços de combustível'},
+        {'name': 'dashboard', 'description': 'Dashboard e métricas'},
+        {'name': 'alerts', 'description': 'Alertas e notificações'},
+        {'name': 'import-export', 'description': 'Importação e exportação de dados'},
+        {'name': 'audit', 'description': 'Logs de auditoria'},
+    ],
+    'SWAGGER_UI_SETTINGS': {
+        'deepLinking': True,
+        'persistAuthorization': True,
+        'displayOperationId': False,
+        'filter': True,
+    },
+    'SWAGGER_UI_DIST': 'SIDECAR',
+    'SWAGGER_UI_FAVICON_HREF': 'SIDECAR',
+    'REDOC_DIST': 'SIDECAR',
 }
 
 # Simple JWT
