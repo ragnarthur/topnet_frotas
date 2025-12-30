@@ -153,14 +153,14 @@ class FuelPriceSnapshot(BaseModel):
         ]
         constraints = [
             models.UniqueConstraint(
-                fields=['fuel_type'],
+                fields=['fuel_type', 'source'],
                 condition=Q(station__isnull=True),
-                name='uniq_fuel_price_global',
+                name='uniq_fuel_price_global_source',
             ),
             models.UniqueConstraint(
-                fields=['fuel_type', 'station'],
+                fields=['fuel_type', 'station', 'source'],
                 condition=Q(station__isnull=False),
-                name='uniq_fuel_price_station',
+                name='uniq_fuel_price_station_source',
             ),
         ]
 
@@ -175,17 +175,27 @@ class FuelPriceSnapshot(BaseModel):
         if station:
             snapshot = cls.objects.filter(
                 fuel_type=fuel_type,
-                station=station
+                station=station,
+                source=FuelPriceSource.LAST_TRANSACTION,
             ).first()
             if snapshot:
                 return snapshot.price_per_liter
 
-        # Prefer national average (external/manual) for global price
+        # Prefer last transaction as global price reference
+        snapshot = cls.objects.filter(
+            fuel_type=fuel_type,
+            station__isnull=True,
+            source=FuelPriceSource.LAST_TRANSACTION,
+        ).first()
+        if snapshot:
+            return snapshot.price_per_liter
+
+        # Fall back to national average (external/manual)
         snapshot = cls.objects.filter(
             fuel_type=fuel_type,
             station__isnull=True,
             source__in=[FuelPriceSource.EXTERNAL_ANP, FuelPriceSource.MANUAL],
-        ).first()
+        ).order_by('-collected_at').first()
         if snapshot:
             return snapshot.price_per_liter
 

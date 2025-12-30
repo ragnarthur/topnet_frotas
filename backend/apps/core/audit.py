@@ -3,6 +3,11 @@ Audit mixin for Django REST Framework ViewSets.
 Automatically logs CREATE, UPDATE, and DELETE operations.
 """
 
+import json
+import uuid
+from datetime import date, datetime
+from decimal import Decimal
+
 from .models import AuditAction, AuditLog
 
 
@@ -14,10 +19,28 @@ def get_client_ip(request):
     return request.META.get('REMOTE_ADDR')
 
 
+def _to_serializable(value):
+    if isinstance(value, dict):
+        return {key: _to_serializable(val) for key, val in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_to_serializable(item) for item in value]
+    if isinstance(value, uuid.UUID):
+        return str(value)
+    if isinstance(value, Decimal):
+        return str(value)
+    if isinstance(value, (datetime, date)):
+        return value.isoformat()
+    try:
+        json.dumps(value)
+        return value
+    except TypeError:
+        return str(value)
+
+
 def model_to_dict(instance, serializer_class=None):
     """Convert model instance to dict for audit logging."""
     if serializer_class:
-        return serializer_class(instance).data
+        return _to_serializable(serializer_class(instance).data)
 
     # Fallback: basic field extraction
     data = {}
@@ -26,16 +49,7 @@ def model_to_dict(instance, serializer_class=None):
         # Convert non-serializable types
         if hasattr(value, 'pk'):
             value = str(value.pk)
-        elif hasattr(value, 'isoformat'):
-            value = value.isoformat()
-        else:
-            try:
-                # Test if JSON serializable
-                import json
-                json.dumps(value)
-            except (TypeError, ValueError):
-                value = str(value)
-        data[field.name] = value
+        data[field.name] = _to_serializable(value)
     return data
 
 

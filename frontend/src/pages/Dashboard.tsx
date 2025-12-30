@@ -91,6 +91,11 @@ export function DashboardPage() {
     color: COLORS[index % COLORS.length],
   }))
 
+  const deltaValue = data.price_reference?.delta ?? null
+  const deltaPercentValue = data.price_reference?.delta_percent ?? null
+  const deltaIsSavings = deltaValue !== null && deltaValue > 0
+  const deltaIsOver = deltaValue !== null && deltaValue < 0
+
   const getCurrentMonthYear = () => {
     return new Date().toLocaleDateString('pt-BR', {
       month: 'long',
@@ -227,22 +232,22 @@ export function DashboardPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Diferença</p>
                   <p className={`text-lg font-semibold ${
-                    data.price_reference.delta && data.price_reference.delta > 0
+                    deltaIsOver
                       ? 'text-red-400'
-                      : data.price_reference.delta && data.price_reference.delta < 0
+                      : deltaIsSavings
                         ? 'text-emerald-400'
                         : ''
                   }`}>
-                    {data.price_reference.delta !== null
-                      ? `${data.price_reference.delta > 0 ? '+' : ''}${formatCurrency(data.price_reference.delta)}`
+                    {deltaValue !== null
+                      ? `${deltaIsSavings ? '+' : ''}${formatCurrency(deltaValue)}`
                       : '—'
                     }
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {data.price_reference.delta && data.price_reference.delta > 0
-                      ? 'acima da média'
-                      : data.price_reference.delta && data.price_reference.delta < 0
-                        ? 'abaixo da média'
+                    {deltaIsSavings
+                      ? 'abaixo da média'
+                      : deltaIsOver
+                        ? 'acima da média'
                         : 'na média'
                     }
                   </p>
@@ -250,14 +255,14 @@ export function DashboardPage() {
                 <div>
                   <p className="text-sm text-muted-foreground">Variação %</p>
                   <p className={`text-lg font-semibold ${
-                    data.price_reference.delta_percent && data.price_reference.delta_percent > 0
+                    deltaIsOver
                       ? 'text-red-400'
-                      : data.price_reference.delta_percent && data.price_reference.delta_percent < 0
+                      : deltaIsSavings
                         ? 'text-emerald-400'
                         : ''
                   }`}>
-                    {data.price_reference.delta_percent !== null
-                      ? `${data.price_reference.delta_percent > 0 ? '+' : ''}${formatNumber(data.price_reference.delta_percent, 1)}%`
+                    {deltaPercentValue !== null
+                      ? `${deltaIsSavings ? '+' : ''}${formatNumber(deltaPercentValue, 1)}%`
                       : '—'
                     }
                   </p>

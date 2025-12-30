@@ -211,9 +211,9 @@ export function TransactionsPage() {
     },
   })
 
-  const loadLatestPrice = async (fuelType: FuelType) => {
+  const loadLatestPrice = async (fuelType: FuelType, stationId?: string) => {
     try {
-      const price = await fuelPrices.latest(fuelType)
+      const price = await fuelPrices.latest(fuelType, stationId)
       if (price) {
         setForm((prev) => ({
           ...prev,
@@ -238,8 +238,14 @@ export function TransactionsPage() {
     const vehicle = vehiclesList?.find((v) => v.id === vehicleId)
     if (vehicle) {
       setForm((prev) => ({ ...prev, fuel_type: vehicle.fuel_type }))
-      await loadLatestPrice(vehicle.fuel_type)
+      await loadLatestPrice(vehicle.fuel_type, form.station || undefined)
     }
+  }
+
+  const handleStationChange = async (stationId: string) => {
+    setForm((prev) => ({ ...prev, station: stationId }))
+    const fuelType = isDriver && driverVehicle ? driverVehicle.fuel_type : form.fuel_type
+    await loadLatestPrice(fuelType, stationId || undefined)
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -482,7 +488,7 @@ export function TransactionsPage() {
                   {isAdmin && (
                     <div className="space-y-2">
                       <Label>Posto</Label>
-                      <Select value={form.station} onValueChange={(v) => setForm((prev) => ({ ...prev, station: v }))}>
+                      <Select value={form.station} onValueChange={handleStationChange}>
                         <SelectTrigger>
                           <SelectValue placeholder="Selecione..." />
                         </SelectTrigger>

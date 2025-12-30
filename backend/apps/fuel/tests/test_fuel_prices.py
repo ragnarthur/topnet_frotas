@@ -26,3 +26,25 @@ def test_latest_fuel_price_returns_manual_snapshot(admin_api_client):
 
     assert response.status_code == 200
     assert Decimal(str(response.data["price_per_liter"])) == Decimal("5.5500")
+
+
+def test_latest_fuel_price_returns_last_transaction_snapshot(admin_api_client, vehicle_operational):
+    payload = {
+        "vehicle": str(vehicle_operational.id),
+        "purchased_at": timezone.now().isoformat(),
+        "liters": "12.000",
+        "unit_price": "6.1000",
+        "odometer_km": 1850,
+        "fuel_type": vehicle_operational.fuel_type,
+    }
+
+    created = admin_api_client.post("/api/fuel-transactions/", payload, format="json")
+    assert created.status_code == 201
+
+    response = admin_api_client.get(
+        f"/api/fuel-prices/latest/?fuel_type={vehicle_operational.fuel_type}"
+    )
+
+    assert response.status_code == 200
+    assert Decimal(str(response.data["price_per_liter"])) == Decimal("6.1000")
+    assert response.data["source"] == FuelPriceSource.LAST_TRANSACTION

@@ -135,10 +135,10 @@ class Command(BaseCommand):
             snapshot, created = FuelPriceSnapshot.objects.update_or_create(
                 fuel_type=fuel_type,
                 station=None,
+                source=FuelPriceSource.MANUAL,
                 defaults={
                     'price_per_liter': price,
                     'collected_at': timezone.now(),
-                    'source': FuelPriceSource.MANUAL,
                 }
             )
             status = 'Created' if created else 'Updated'

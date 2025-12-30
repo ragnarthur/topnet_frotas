@@ -67,24 +67,42 @@ def update_fuel_price_snapshot(sender, instance, created, **kwargs):
     This keeps the "current price" always up-to-date based on real data.
     """
     try:
+        snapshot_to_notify = None
+
         # Update station-specific snapshot if station is set (pump price reference)
         if instance.station_id:
             snapshot, _ = FuelPriceSnapshot.objects.update_or_create(
                 fuel_type=instance.fuel_type,
                 station_id=instance.station_id,
+                source=FuelPriceSource.LAST_TRANSACTION,
                 defaults={
                     'price_per_liter': instance.unit_price,
                     'collected_at': instance.purchased_at,
-                    'source': FuelPriceSource.LAST_TRANSACTION,
                 }
             )
-            publish_event({
-                'type': 'FUEL_PRICE_UPDATED',
-                'fuel_type': snapshot.fuel_type,
-                'station_id': str(snapshot.station_id) if snapshot.station_id else None,
-                'price_per_liter': str(snapshot.price_per_liter),
-                'source': snapshot.source,
-            })
+            snapshot_to_notify = snapshot
+
+        # Always update global last-transaction snapshot
+        global_snapshot, _ = FuelPriceSnapshot.objects.update_or_create(
+            fuel_type=instance.fuel_type,
+            station=None,
+            source=FuelPriceSource.LAST_TRANSACTION,
+            defaults={
+                'price_per_liter': instance.unit_price,
+                'collected_at': instance.purchased_at,
+            }
+        )
+
+        if snapshot_to_notify is None:
+            snapshot_to_notify = global_snapshot
+
+        publish_event({
+            'type': 'FUEL_PRICE_UPDATED',
+            'fuel_type': snapshot_to_notify.fuel_type,
+            'station_id': str(snapshot_to_notify.station_id) if snapshot_to_notify.station_id else None,
+            'price_per_liter': str(snapshot_to_notify.price_per_liter),
+            'source': snapshot_to_notify.source,
+        })
 
         logger.info(
             f"Updated fuel price snapshot: {instance.fuel_type} = R$ {instance.unit_price}"

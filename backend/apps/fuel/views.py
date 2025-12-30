@@ -8,6 +8,15 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 from django_filters import rest_framework as filters
 from django.http import HttpResponse
+from drf_spectacular.utils import (
+    extend_schema,
+    extend_schema_view,
+    OpenApiParameter,
+    OpenApiExample,
+    OpenApiTypes,
+    inline_serializer,
+)
+from rest_framework import serializers as drf_serializers
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -49,7 +58,54 @@ class FuelTransactionFilter(filters.FilterSet):
         fields = ['vehicle', 'driver', 'cost_center', 'station', 'fuel_type']
 
 
+@extend_schema_view(
+    list=extend_schema(
+        tags=['fuel-transactions'],
+        summary='Listar abastecimentos',
+        description='Retorna lista paginada de abastecimentos com filtros opcionais.',
+        parameters=[
+            OpenApiParameter('from_date', OpenApiTypes.DATE, description='Data inicial (YYYY-MM-DD)'),
+            OpenApiParameter('to_date', OpenApiTypes.DATE, description='Data final (YYYY-MM-DD)'),
+            OpenApiParameter('vehicle', OpenApiTypes.UUID, description='ID do veículo'),
+            OpenApiParameter('driver', OpenApiTypes.UUID, description='ID do motorista'),
+            OpenApiParameter('cost_center', OpenApiTypes.UUID, description='ID do centro de custo'),
+            OpenApiParameter('station', OpenApiTypes.UUID, description='ID do posto'),
+            OpenApiParameter('fuel_type', OpenApiTypes.STR, description='Tipo de combustível (GASOLINE, ETHANOL, DIESEL)'),
+        ],
+    ),
+    create=extend_schema(
+        tags=['fuel-transactions'],
+        summary='Registrar abastecimento',
+        description='Cria um novo registro de abastecimento. Motoristas só podem registrar para seu veículo atual.',
+    ),
+    retrieve=extend_schema(
+        tags=['fuel-transactions'],
+        summary='Detalhes do abastecimento',
+        description='Retorna detalhes completos de um abastecimento específico.',
+    ),
+    update=extend_schema(
+        tags=['fuel-transactions'],
+        summary='Atualizar abastecimento',
+        description='Atualiza um abastecimento existente. Apenas administradores.',
+    ),
+    partial_update=extend_schema(
+        tags=['fuel-transactions'],
+        summary='Atualizar parcialmente',
+        description='Atualiza parcialmente um abastecimento. Apenas administradores.',
+    ),
+    destroy=extend_schema(
+        tags=['fuel-transactions'],
+        summary='Excluir abastecimento',
+        description='Remove um abastecimento. Apenas administradores.',
+    ),
+)
 class FuelTransactionViewSet(AuditMixin, viewsets.ModelViewSet):
+    """
+    ViewSet para gerenciamento de abastecimentos.
+
+    Permite criar, listar, atualizar e excluir registros de abastecimento.
+    Motoristas podem apenas visualizar e criar abastecimentos para seu veículo atual.
+    """
     queryset = FuelTransaction.objects.select_related(
         'vehicle', 'driver', 'station', 'cost_center'
     ).all()
@@ -134,7 +190,20 @@ class FuelTransactionViewSet(AuditMixin, viewsets.ModelViewSet):
         return super().destroy(request, *args, **kwargs)
 
 
+@extend_schema_view(
+    list=extend_schema(
+        tags=['fuel-prices'],
+        summary='Listar snapshots de preço',
+        description='Histórico de preços de combustível registrados.',
+    ),
+    retrieve=extend_schema(
+        tags=['fuel-prices'],
+        summary='Detalhes do snapshot',
+        description='Detalhes de um snapshot de preço específico.',
+    ),
+)
 class FuelPriceSnapshotViewSet(viewsets.ReadOnlyModelViewSet):
+    """ViewSet para consulta de histórico de preços de combustível."""
     queryset = FuelPriceSnapshot.objects.select_related('station').all()
     serializer_class = FuelPriceSnapshotSerializer
     permission_classes = [IsAdminUser]
@@ -145,6 +214,30 @@ class FuelPriceSnapshotViewSet(viewsets.ReadOnlyModelViewSet):
 class LatestFuelPriceView(APIView):
     """Get the latest fuel price for a given fuel type and optionally station."""
 
+    @extend_schema(
+        tags=['fuel-prices'],
+        summary='Obter preço atual',
+        description='Retorna o preço mais recente para um tipo de combustível. Se informado o posto, retorna o preço específico do posto.',
+        parameters=[
+            OpenApiParameter('fuel_type', OpenApiTypes.STR, required=True, description='Tipo de combustível (GASOLINE, ETHANOL, DIESEL)'),
+            OpenApiParameter('station_id', OpenApiTypes.UUID, description='ID do posto (opcional)'),
+        ],
+        responses={
+            200: inline_serializer(
+                name='LatestFuelPriceResponse',
+                fields={
+                    'fuel_type': drf_serializers.CharField(),
+                    'price_per_liter': drf_serializers.DecimalField(max_digits=8, decimal_places=4),
+                    'collected_at': drf_serializers.DateTimeField(),
+                    'source': drf_serializers.CharField(),
+                    'station_id': drf_serializers.UUIDField(allow_null=True),
+                    'station_name': drf_serializers.CharField(allow_null=True),
+                }
+            ),
+            400: inline_serializer(name='ErrorResponse', fields={'error': drf_serializers.CharField()}),
+            404: inline_serializer(name='NotFoundResponse', fields={'error': drf_serializers.CharField()}),
+        }
+    )
     def get(self, request):
         fuel_type = request.query_params.get('fuel_type')
         station_id = request.query_params.get('station_id')
@@ -159,7 +252,8 @@ class LatestFuelPriceView(APIView):
         if station_id:
             snapshot = FuelPriceSnapshot.objects.filter(
                 fuel_type=fuel_type,
-                station_id=station_id
+                station_id=station_id,
+                source=FuelPriceSource.LAST_TRANSACTION,
             ).first()
             if snapshot:
                 data = {
@@ -172,16 +266,24 @@ class LatestFuelPriceView(APIView):
                 }
                 return Response(data)
 
-        # Prefer national average (external/manual) for global price
+        # Prefer last transaction (global)
         snapshot = FuelPriceSnapshot.objects.filter(
             fuel_type=fuel_type,
             station__isnull=True,
-            source__in=[FuelPriceSource.EXTERNAL_ANP, FuelPriceSource.MANUAL]
+            source=FuelPriceSource.LAST_TRANSACTION,
         ).first()
+
+        # Fall back to national average (external/manual)
+        if not snapshot:
+            snapshot = FuelPriceSnapshot.objects.filter(
+                fuel_type=fuel_type,
+                station__isnull=True,
+                source__in=[FuelPriceSource.EXTERNAL_ANP, FuelPriceSource.MANUAL],
+            ).order_by('-collected_at').first()
 
         if not snapshot:
             return Response(
-                {'error': 'No national average price found for this fuel type'},
+                {'error': 'No fuel price found for this fuel type'},
                 status=status.HTTP_404_NOT_FOUND
             )
 
@@ -200,6 +302,13 @@ class NationalFuelPriceView(APIView):
     """Create/update national average fuel price (manual reference)."""
     permission_classes = [IsAdminUser]
 
+    @extend_schema(
+        tags=['fuel-prices'],
+        summary='Atualizar preço nacional',
+        description='Cria ou atualiza o preço médio nacional de referência para um tipo de combustível.',
+        request=NationalFuelPriceUpsertSerializer,
+        responses={200: FuelPriceSnapshotSerializer},
+    )
     def post(self, request):
         serializer = NationalFuelPriceUpsertSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -211,10 +320,10 @@ class NationalFuelPriceView(APIView):
         snapshot, _ = FuelPriceSnapshot.objects.update_or_create(
             fuel_type=fuel_type,
             station=None,
+            source=FuelPriceSource.MANUAL,
             defaults={
                 'price_per_liter': price_per_liter,
                 'collected_at': collected_at,
-                'source': FuelPriceSource.MANUAL,
             }
         )
 
@@ -225,6 +334,51 @@ class DashboardSummaryView(APIView):
     """Dashboard summary with costs, consumption and alerts."""
     permission_classes = [IsAdminUser]
 
+    @extend_schema(
+        tags=['dashboard'],
+        summary='Resumo do dashboard',
+        description='''
+Retorna métricas consolidadas do período:
+- Custo total e litros consumidos
+- Custo por veículo com km/L e custo/km
+- Custo por centro de custo
+- Tendência mensal (últimos 6 meses)
+- Comparação com preço médio nacional
+- Alertas abertos
+        ''',
+        parameters=[
+            OpenApiParameter('from', OpenApiTypes.DATE, description='Data inicial (YYYY-MM-DD). Padrão: primeiro dia do mês atual'),
+            OpenApiParameter('to', OpenApiTypes.DATE, description='Data final (YYYY-MM-DD). Padrão: hoje'),
+            OpenApiParameter('include_personal', OpenApiTypes.STR, description='Incluir veículos pessoais (0 ou 1). Padrão: 0'),
+        ],
+        responses={
+            200: inline_serializer(
+                name='DashboardSummaryResponse',
+                fields={
+                    'period': inline_serializer(
+                        name='PeriodInfo',
+                        fields={
+                            'from': drf_serializers.DateField(),
+                            'to': drf_serializers.DateField(),
+                            'include_personal': drf_serializers.BooleanField(),
+                        }
+                    ),
+                    'summary': inline_serializer(
+                        name='SummaryInfo',
+                        fields={
+                            'total_cost': drf_serializers.DecimalField(max_digits=12, decimal_places=2),
+                            'total_liters': drf_serializers.DecimalField(max_digits=12, decimal_places=2),
+                            'transaction_count': drf_serializers.IntegerField(),
+                        }
+                    ),
+                    'cost_by_vehicle': drf_serializers.ListField(child=drf_serializers.DictField()),
+                    'cost_by_cost_center': drf_serializers.ListField(child=drf_serializers.DictField()),
+                    'monthly_trend': drf_serializers.ListField(child=drf_serializers.DictField()),
+                    'alerts': drf_serializers.DictField(),
+                }
+            ),
+        }
+    )
     def get(self, request):
         # Parse date filters
         from_date = request.query_params.get('from')
@@ -456,6 +610,29 @@ class FetchANPPricesView(APIView):
     """Manually trigger ANP price fetch."""
     permission_classes = [IsAdminUser]
 
+    @extend_schema(
+        tags=['fuel-prices'],
+        summary='Buscar preços ANP',
+        description='Dispara busca manual de preços de combustível da ANP (Agência Nacional do Petróleo).',
+        request=None,
+        responses={
+            200: inline_serializer(
+                name='ANPFetchSuccessResponse',
+                fields={
+                    'message': drf_serializers.CharField(),
+                    'prices_updated': drf_serializers.IntegerField(),
+                    'source_url': drf_serializers.CharField(allow_null=True),
+                }
+            ),
+            500: inline_serializer(
+                name='ANPFetchErrorResponse',
+                fields={
+                    'message': drf_serializers.CharField(),
+                    'errors': drf_serializers.ListField(child=drf_serializers.CharField()),
+                }
+            ),
+        }
+    )
     def post(self, request):
         from apps.fuel.services import fetch_and_save_anp_prices
 
@@ -478,6 +655,19 @@ class FuelTransactionsExportView(APIView):
     """Export fuel transactions to CSV."""
     permission_classes = [IsAdminUser]
 
+    @extend_schema(
+        tags=['import-export'],
+        summary='Exportar abastecimentos',
+        description='Exporta abastecimentos do período para arquivo CSV.',
+        parameters=[
+            OpenApiParameter('from', OpenApiTypes.DATE, description='Data inicial (YYYY-MM-DD)'),
+            OpenApiParameter('to', OpenApiTypes.DATE, description='Data final (YYYY-MM-DD)'),
+            OpenApiParameter('include_personal', OpenApiTypes.STR, description='Incluir veículos pessoais (0 ou 1)'),
+        ],
+        responses={
+            (200, 'text/csv'): OpenApiTypes.BINARY,
+        }
+    )
     def get(self, request):
         from_date = request.query_params.get('from')
         to_date = request.query_params.get('to')
@@ -559,6 +749,42 @@ class DriverDashboardView(APIView):
     """Dashboard for drivers - shows their own stats and recent transactions."""
     permission_classes = [IsDriver]
 
+    @extend_schema(
+        tags=['dashboard'],
+        summary='Dashboard do motorista',
+        description='Retorna estatísticas e transações recentes do motorista logado (últimos 30 dias).',
+        responses={
+            200: inline_serializer(
+                name='DriverDashboardResponse',
+                fields={
+                    'driver': inline_serializer(
+                        name='DriverInfo',
+                        fields={
+                            'id': drf_serializers.UUIDField(),
+                            'name': drf_serializers.CharField(),
+                        }
+                    ),
+                    'period': inline_serializer(
+                        name='DriverPeriodInfo',
+                        fields={
+                            'from': drf_serializers.DateField(),
+                            'to': drf_serializers.DateField(),
+                        }
+                    ),
+                    'stats': inline_serializer(
+                        name='DriverStats',
+                        fields={
+                            'total_liters': drf_serializers.DecimalField(max_digits=12, decimal_places=2),
+                            'total_cost': drf_serializers.DecimalField(max_digits=12, decimal_places=2),
+                            'transaction_count': drf_serializers.IntegerField(),
+                            'avg_km_per_liter': drf_serializers.FloatField(allow_null=True),
+                        }
+                    ),
+                    'recent_transactions': drf_serializers.ListField(child=drf_serializers.DictField()),
+                }
+            ),
+        }
+    )
     def get(self, request):
         user = request.user
 
@@ -634,6 +860,42 @@ class FuelTransactionsImportView(APIView):
     permission_classes = [IsAdminUser]
     parser_classes = [MultiPartParser]
 
+    @extend_schema(
+        tags=['import-export'],
+        summary='Importar abastecimentos',
+        description='''
+Importa abastecimentos a partir de arquivo CSV.
+
+O arquivo deve seguir o formato do template disponível em `/api/import/transactions/template/`.
+Máximo 10MB por arquivo.
+        ''',
+        request={
+            'multipart/form-data': {
+                'type': 'object',
+                'properties': {
+                    'file': {'type': 'string', 'format': 'binary', 'description': 'Arquivo CSV'}
+                },
+                'required': ['file']
+            }
+        },
+        responses={
+            200: inline_serializer(
+                name='ImportSuccessResponse',
+                fields={
+                    'success': drf_serializers.BooleanField(),
+                    'total_rows': drf_serializers.IntegerField(),
+                    'imported_count': drf_serializers.IntegerField(),
+                    'skipped_count': drf_serializers.IntegerField(),
+                    'error_count': drf_serializers.IntegerField(),
+                    'errors': drf_serializers.ListField(child=drf_serializers.DictField()),
+                }
+            ),
+            400: inline_serializer(
+                name='ImportErrorResponse',
+                fields={'error': drf_serializers.CharField()}
+            ),
+        }
+    )
     def post(self, request):
         file = request.FILES.get('file')
         if not file:
@@ -672,6 +934,12 @@ class FuelTransactionsImportTemplateView(APIView):
     """Download CSV template for fuel transactions import."""
     permission_classes = [IsAdminUser]
 
+    @extend_schema(
+        tags=['import-export'],
+        summary='Download template CSV',
+        description='Baixa o modelo de arquivo CSV para importação de abastecimentos.',
+        responses={(200, 'text/csv'): OpenApiTypes.BINARY},
+    )
     def get(self, request):
         template = generate_csv_template()
 
@@ -684,5 +952,11 @@ class FuelTransactionsImportFormatView(APIView):
     """Get CSV format specification for documentation."""
     permission_classes = [IsAdminUser]
 
+    @extend_schema(
+        tags=['import-export'],
+        summary='Especificação do formato CSV',
+        description='Retorna a especificação detalhada do formato CSV para importação.',
+        responses={200: OpenApiTypes.OBJECT},
+    )
     def get(self, request):
         return Response(get_csv_format_specification())

@@ -209,10 +209,10 @@ def fetch_and_save_anp_prices() -> dict[str, any]:
             snapshot, created = FuelPriceSnapshot.objects.update_or_create(
                 fuel_type=fuel_type,
                 station=None,  # National average
+                source=FuelPriceSource.EXTERNAL_ANP,
                 defaults={
                     'price_per_liter': price,
                     'collected_at': now,
-                    'source': FuelPriceSource.EXTERNAL_ANP,
                 }
             )
 

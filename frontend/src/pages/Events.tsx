@@ -1,12 +1,14 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { Activity, AlertTriangle, Fuel, RefreshCcw, ShieldAlert } from 'lucide-react'
 import { vehicles } from '@/api/client'
+import { tokenStore } from '@/lib/tokenStore'
 import { formatDateTime } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import type { AlertSeverity, RealtimeEvent } from '@/types'
+import { useAuth } from '@/hooks/useAuth'
 import {
   Select,
   SelectContent,
@@ -48,17 +50,57 @@ const TYPE_ICONS: Record<string, React.ElementType> = {
   FUEL_PRICE_UPDATED: Activity,
 }
 
+const MAX_EVENTS = 200
+
 export function EventsPage() {
+  const { isAuthenticated, isAdmin, isLoading } = useAuth()
   const [typeFilter, setTypeFilter] = useState<RealtimeEvent['type'] | 'ALL'>('ALL')
   const [vehicleFilter, setVehicleFilter] = useState('ALL')
   const [severityFilter, setSeverityFilter] = useState<AlertSeverity | 'ALL'>('ALL')
+  const [events, setEvents] = useState<RealtimeEvent[]>([])
+  const [isConnected, setIsConnected] = useState(false)
 
-  const { data: events = [] } = useQuery<RealtimeEvent[]>({
-    queryKey: ['realtime-events'],
-    queryFn: async () => [],
-    enabled: false,
-    initialData: [],
-  })
+  useEffect(() => {
+    if (isLoading || !isAuthenticated || !isAdmin) {
+      return
+    }
+    const token = tokenStore.getAccess()
+    if (!token) {
+      return
+    }
+
+    const source = new EventSource(`/api/events/stream/?token=${encodeURIComponent(token)}`)
+
+    source.onopen = () => setIsConnected(true)
+    source.onerror = () => setIsConnected(false)
+    source.onmessage = (event) => {
+      try {
+        const raw = JSON.parse(event.data) as Record<string, unknown>
+        const eventId = typeof raw.event_id === 'string'
+          ? raw.event_id
+          : `${Date.now()}-${Math.random().toString(16).slice(2)}`
+        const timestamp = typeof raw.timestamp === 'string' ? raw.timestamp : new Date().toISOString()
+        const type = typeof raw.type === 'string' ? raw.type : 'EVENT'
+
+        const { event_id: _eventId, timestamp: _ts, type: _type, ...payload } = raw
+        const normalized: RealtimeEvent = {
+          id: eventId,
+          type,
+          timestamp,
+          payload,
+        }
+
+        setEvents((prev) => [normalized, ...prev].slice(0, MAX_EVENTS))
+      } catch {
+        // Ignore malformed events
+      }
+    }
+
+    return () => {
+      source.close()
+      setIsConnected(false)
+    }
+  }, [isAuthenticated, isAdmin, isLoading])
 
   const { data: vehiclesList } = useQuery({
     queryKey: ['vehicles'],
@@ -116,7 +158,9 @@ export function EventsPage() {
             Monitoramento das atualizações do sistema em tempo real
           </p>
         </div>
-        <Badge variant="secondary">live</Badge>
+        <Badge variant={isConnected ? 'secondary' : 'outline'}>
+          {isConnected ? 'live' : 'offline'}
+        </Badge>
       </motion.div>
 
       <motion.div variants={itemVariants} className="glass-card rounded-2xl p-6">
