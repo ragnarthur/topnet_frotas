@@ -1,7 +1,7 @@
 from django.conf import settings
 from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers as drf_serializers
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle
@@ -84,6 +84,7 @@ class CookieTokenObtainPairView(ThrottledTokenObtainPairView):
 
 class CookieTokenRefreshSerializer(TokenRefreshSerializer):
     """Read refresh token from cookie when not provided in request body."""
+    refresh = serializers.CharField(required=False)
 
     def validate(self, attrs):
         if 'refresh' not in attrs or not attrs.get('refresh'):

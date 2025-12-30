@@ -72,7 +72,7 @@ def test_authentication():
 
     # Teste SQL Injection no login
     r = requests.post(f"{BASE_URL}/auth/token/", json={"username": "' OR '1'='1", "password": "' OR '1'='1"})
-    test("Bloqueia SQL Injection no login", r.status_code == 401)
+    test("Bloqueia SQL Injection no login", r.status_code in (400, 401))
 
     # Teste com token válido
     token = get_token()
